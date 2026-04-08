@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  lastName      String?
+  email         String    @unique
+  password      String
+  role          String    @default("editor") // "admin" | "editor"
+  photoUrl      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Zone {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  properties  Property[]
+  templates   ContractTemplate[]
+  createdAt   DateTime   @default(now())
+}
+
+model Property {
+  id              String      @id @default(cuid())
+  number          String      @unique
+  name            String
+  squareMeters    Float
+  propertyType    String      // "casa", "departamento", "bodega", "local", "terreno"
+  status          String      @default("available") // "available", "rented", "maintenance"
+  address         String?
+  description     String?
+  adminNotes      String?   // Notas/comentarios del administrador
+  monthlyRent     Float?
+  zoneId          String
+  zone            Zone        @relation(fields: [zoneId], references: [id])
+  contracts       Contract[]
+  photos          Photo[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Contract {
+  id                String    @id @default(cuid())
+  propertyId        String
+  property          Property  @relation(fields: [propertyId], references: [id])
+  tenantName        String
+  tenantEmail       String?
+  tenantPhone       String?
+  tenantWhatsapp    String?
+  startDate         DateTime
+  endDate           DateTime
+  reviewDate        DateTime? // fecha de revisión de incrementos (multi-anual)
+  monthlyRent       Float
+  annualIncrement   Float?    // porcentaje de incremento anual
+  depositAmount     Float?
+  contractType      String    @default("arrendamiento") // arrendamiento, comodato, temporal, comercial
+  status            String    @default("active") // "active", "expired", "pending_renewal", "cancelled"
+  notes             String?
+  contractFileUrl   String?   // URL del archivo de contrato subido (PDF/Word)
+  contractFileName  String?   // nombre original del archivo
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  alerts            Alert[]
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url         String
+  caption     String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  type        String    // "contract_expiry", "rent_review", "renewal_contact", "payment_due"
+  title       String
+  message     String
+  dueDate     DateTime
+  status      String    @default("pending") // "pending", "sent", "dismissed"
+  contractId  String?
+  contract    Contract? @relation(fields: [contractId], references: [id])
+  sentEmail   Boolean   @default(false)
+  sentWhatsapp Boolean  @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  content     String   // template content with placeholders
+  year        Int
+  zoneId      String?  // si es null, aplica como plantilla general
+  zone        Zone?    @relation(fields: [zoneId], references: [id])
+  contractType String  @default("arrendamiento") // arrendamiento, comodato, temporal, comercial, etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
