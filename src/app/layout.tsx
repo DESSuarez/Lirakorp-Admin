@@ -7,8 +7,8 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Administración de Propiedades',
-  description: 'Sistema de gestión de propiedades, contratos y rentas',
+  title: 'LIRAKORP - Sistema de Gestion de Propiedades',
+  description: 'Sistema de gestion de propiedades, contratos y rentas para LIRAKORP',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

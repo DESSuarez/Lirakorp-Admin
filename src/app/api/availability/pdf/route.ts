@@ -270,7 +270,7 @@ function drawCoverPage(pdf: PDF, zones: any[], filterLabel: string, dateStr: str
 
   pdf.y = M + 15
   pdf.line(M, pdf.y + 10, PW - M, 0.88, 0.88, 0.88, 0.5)
-  pdf.text('PropAdmin - Sistema de Gestion de Propiedades', M, 8, false, 0.6, 0.6, 0.6)
+  pdf.text('LIRAKORP - Sistema de Gestion de Propiedades', M, 8, false, 0.6, 0.6, 0.6)
 }
 
 async function drawPropertyPage(pdf: PDF, property: any, zoneName: string, dateStr: string) {
@@ -410,7 +410,7 @@ async function drawPropertyPage(pdf: PDF, property: any, zoneName: string, dateS
   // Footer
   pdf.y = M + 12
   pdf.line(M, pdf.y + 8, PW - M, 0.9, 0.9, 0.9, 0.5)
-  pdf.text(`PropAdmin  |  ${zoneName}  |  ${property.number}`, M, 7, false, 0.65, 0.65, 0.65)
+  pdf.text(`LIRAKORP  |  ${zoneName}  |  ${property.number}`, M, 7, false, 0.65, 0.65, 0.65)
   pdf.text(dateStr, PW - M - 100, 7, false, 0.65, 0.65, 0.65)
 }
 

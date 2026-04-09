@@ -62,7 +62,7 @@ export async function GET() {
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="Propiedades_PropAdmin_${date}.xlsx"`,
+      'Content-Disposition': `attachment; filename="Propiedades_LIRAKORP_${date}.xlsx"`,
     },
   })
 }

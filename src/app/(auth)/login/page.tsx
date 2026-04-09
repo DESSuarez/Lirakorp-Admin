@@ -59,8 +59,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, #2B2B2B 0%, #141414 100%)' }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">PropAdmin</h1>
-          <p className="text-gray-400 mt-2">Sistema de Gestion de Propiedades</p>
+          <h1 className="text-3xl font-bold text-white">LIRAKORP</h1>
+          <p className="text-gray-400 mt-2">Sistema de Gestion de Propiedades para LIRAKORP</p>
         </div>
         <Suspense fallback={<div className="card text-center p-8">Cargando...</div>}>
           <LoginForm />
