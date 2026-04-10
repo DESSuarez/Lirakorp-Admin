@@ -83,14 +83,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const months = differenceInMonths(contract.endDate, contract.startDate)
 
-  // Build replacement map: key = text to find, value = replacement or null (PENDIENTE)
-  const replacements: Record<string, string | null> = {
+  // Build replacement map
+  // All values are filled - missing data gets [PENDIENTE: label] as the replacement text
+  const pend = (label: string) => `[PENDIENTE: ${label}]`
+
+  const replacements: Record<string, string> = {
     // Tenant names (from both templates)
     'LUIS MIGUEL ARIZA JIMENEZ': contract.tenantName,
     'MICA IMELY': contract.tenantName,
-    // Fiador names
-    'ALICIA DIAZ NAVEZ': contract.fiadorName || null,
-    'LUIS FACUNDO IMELY': contract.fiadorName || null,
+    // Fiador names - replace with actual or PENDIENTE
+    'ALICIA DIAZ NAVEZ': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
+    'LUIS FACUNDO IMELY': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
     // Dates - Las Juntas template
     '15 de Diciembre del año 2025 dos mil veinticinco': formatDate(contract.startDate),
     '15 de Diciembre  de  2025': formatDate(contract.startDate),
@@ -107,8 +110,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     '$19,500.00': formatCurrency(contract.monthlyRent),
     'DIECINUEVE MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
     // Maintenance
-    '$ 300.00': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : null,
-    'Trecientos pesos 00/100 M.N': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : null,
+    '$ 300.00': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : pend('CUOTA MANTENIMIENTO'),
+    'Trecientos pesos 00/100 M.N': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : pend('CUOTA MANTENIMIENTO EN LETRA'),
     // Department/property number
     'DEPARTAMENTO # 08': `DEPARTAMENTO # ${contract.property.number}`,
     'DEPARTAMENTO No. 08': `DEPARTAMENTO No. ${contract.property.number}`,
@@ -118,13 +121,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     'UN AÑO': `${months} MESES`,
   }
 
-  // Process template: replace known values, mark unknowns as PENDIENTE
+  // Process template: replace all values (missing ones already have PENDIENTE text)
   let content = template.content
 
   for (const [search, replace] of Object.entries(replacements)) {
-    if (replace !== null) {
-      content = content.split(search).join(replace)
-    }
+    content = content.split(search).join(replace)
   }
 
   // Build Word document paragraphs
@@ -144,20 +145,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const isClauseStart = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|S[EÉ]PTIMA|OCTAVA|NOVENA|D[EÉ]CIMA|VIG[EÉ]SI)/.test(trimmed)
     const isSectionHeader = /^[IVX]+[\.\s]/.test(trimmed)
 
-    // Check for null replacements (PENDIENTE fields) and create mixed runs
+    // Build text runs - detect [PENDIENTE: ...] markers for yellow highlight
     const children: TextRun[] = []
     let processedText = trimmed
-
-    // Replace null values with PENDIENTE markers
-    for (const [search, replace] of Object.entries(replacements)) {
-      if (replace === null && processedText.includes(search)) {
-        const parts = processedText.split(search)
-        // Rebuild with PENDIENTE - we'll handle this in a simple way
-        processedText = processedText.split(search).join(`[PENDIENTE: ${search}]`)
-      }
-    }
-
-    // Check if text contains PENDIENTE markers
     if (processedText.includes('[PENDIENTE:')) {
       const regex = /\[PENDIENTE: ([^\]]+)\]/g
       let lastIndex = 0
