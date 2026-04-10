@@ -1,428 +1,269 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-  HeadingLevel,
-  TabStopPosition,
-  TabStopType,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
-} from 'docx';
-import { formatCurrency, formatDate } from '@/lib/utils';
+  Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
+  Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
+} from 'docx'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { differenceInMonths } from 'date-fns'
 
-interface RouteParams {
-  params: Promise<{ id: string }>;
+function numberToWords(n: number): string {
+  const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
+  const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE']
+  const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
+  const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
+  const num = Math.floor(n)
+  if (num === 0) return 'CERO'
+  if (num === 100) return 'CIEN'
+  let result = ''
+  const th = Math.floor(num / 1000)
+  const rem = num % 1000
+  if (th > 0) { result += (th === 1 ? 'MIL ' : convertH(th) + ' MIL ') }
+  if (rem > 0) result += convertH(rem)
+  return result.trim()
+  function convertH(n: number): string {
+    if (n === 0) return ''
+    if (n === 100) return 'CIEN'
+    let r = ''
+    const h = Math.floor(n / 100), t = n % 100
+    if (h > 0) r += hundreds[h] + ' '
+    if (t >= 10 && t <= 19) r += teens[t - 10]
+    else if (t >= 20 && t <= 29 && t !== 20) r += 'VEINTI' + units[t - 20]
+    else { const d = Math.floor(t / 10), u = t % 10; if (d > 0) r += tens[d]; if (d > 0 && u > 0) r += ' Y '; if (u > 0) r += units[u] }
+    return r.trim()
+  }
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+// Create a PENDIENTE text run with yellow highlight
+function pendiente(label: string): TextRun {
+  return new TextRun({
+    text: `[PENDIENTE: ${label}]`,
+    bold: true,
+    underline: {},
+    shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFF00' },
+    font: 'Arial',
+    size: 22,
+  })
+}
+
+function normalRun(text: string, bold = false, size = 22): TextRun {
+  return new TextRun({ text, bold, font: 'Arial', size })
+}
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { id } = await params
+
+  const contract = await prisma.contract.findUnique({
+    where: { id },
+    include: { property: { include: { zone: true } } },
+  })
+
+  if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
+
+  // Find template by zone first, then general
+  let template = await prisma.contractTemplate.findFirst({
+    where: { zoneId: contract.property.zoneId, isActive: true },
+    orderBy: { year: 'desc' },
+  })
+  if (!template) {
+    template = await prisma.contractTemplate.findFirst({
+      where: { zoneId: null, isActive: true },
+      orderBy: { year: 'desc' },
+    })
   }
 
-  const { id } = await params;
+  if (!template) {
+    return NextResponse.json({ error: 'No se encontro plantilla para esta zona. Suba una plantilla en la seccion de Plantillas.' }, { status: 404 })
+  }
 
-  try {
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-      include: {
-        property: {
-          include: { zone: true },
-        },
-      },
-    });
+  const months = differenceInMonths(contract.endDate, contract.startDate)
 
-    if (!contract) {
-      return NextResponse.json(
-        { error: 'Contrato no encontrado' },
-        { status: 404 }
-      );
+  // Build replacement map: key = text to find, value = replacement or null (PENDIENTE)
+  const replacements: Record<string, string | null> = {
+    // Tenant names (from both templates)
+    'LUIS MIGUEL ARIZA JIMENEZ': contract.tenantName,
+    'MICA IMELY': contract.tenantName,
+    // Fiador names
+    'ALICIA DIAZ NAVEZ': contract.fiadorName || null,
+    'LUIS FACUNDO IMELY': contract.fiadorName || null,
+    // Dates - Las Juntas template
+    '15 de Diciembre del año 2025 dos mil veinticinco': formatDate(contract.startDate),
+    '15 de Diciembre  de  2025': formatDate(contract.startDate),
+    '15 de Diciembre de  2025': formatDate(contract.startDate),
+    '14 de Diciembre 2026': formatDate(contract.endDate),
+    '14 DE Diciembre  de  2026': formatDate(contract.endDate),
+    '14 de Diciembre  de 2026': formatDate(contract.endDate),
+    // Dates - Ciudad Granja template
+    '11 de Diciembre de 2025 dos mil veinticinco': formatDate(contract.startDate),
+    '10 de Diciembre de 2026': formatDate(contract.endDate),
+    // Rent amounts
+    '$7,900.00': formatCurrency(contract.monthlyRent),
+    'SIETE MIL NOVECIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '$19,500.00': formatCurrency(contract.monthlyRent),
+    'DIECINUEVE MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    // Maintenance
+    '$ 300.00': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : null,
+    'Trecientos pesos 00/100 M.N': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : null,
+    // Department/property number
+    'DEPARTAMENTO # 08': `DEPARTAMENTO # ${contract.property.number}`,
+    'DEPARTAMENTO No. 08': `DEPARTAMENTO No. ${contract.property.number}`,
+    'CASA No, 1 (UNO)': `CASA No. ${contract.property.number}`,
+    // Duration
+    '( UN AÑO)': `(${months} MESES)`,
+    'UN AÑO': `${months} MESES`,
+  }
+
+  // Process template: replace known values, mark unknowns as PENDIENTE
+  let content = template.content
+
+  for (const [search, replace] of Object.entries(replacements)) {
+    if (replace !== null) {
+      content = content.split(search).join(replace)
+    }
+  }
+
+  // Build Word document paragraphs
+  const lines = content.split('\n')
+  const paragraphs: Paragraph[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) {
+      paragraphs.push(new Paragraph({ spacing: { after: 100 } }))
+      continue
     }
 
-    // Buscar plantilla en BD
-    let templateText: string | null = null;
-    try {
-      const template = await prisma.contractTemplate.findFirst({
-        where: { isActive: true },
-      });
-      templateText = template?.content || null;
-    } catch {
-      // Si no existe el modelo, usar plantilla por defecto
-    }
+    const isMainTitle = trimmed.includes('CONTRATO DE SUBARRENDAMIENTO') && trimmed.length < 45
+    const isDeclaraciones = /^D\s*E\s*C\s*L\s*A\s*R\s*A\s*C\s*I\s*O\s*N\s*E\s*S/.test(trimmed)
+    const isClausulas = /^C\s*L\s*A\s*U\s*S\s*U\s*L\s*A\s*S/.test(trimmed)
+    const isClauseStart = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|S[EÉ]PTIMA|OCTAVA|NOVENA|D[EÉ]CIMA|VIG[EÉ]SI)/.test(trimmed)
+    const isSectionHeader = /^[IVX]+[\.\s]/.test(trimmed)
 
-    const noBorder = {
-      top: { style: BorderStyle.NONE, size: 0 },
-      bottom: { style: BorderStyle.NONE, size: 0 },
-      left: { style: BorderStyle.NONE, size: 0 },
-      right: { style: BorderStyle.NONE, size: 0 },
-    };
+    // Check for null replacements (PENDIENTE fields) and create mixed runs
+    const children: TextRun[] = []
+    let processedText = trimmed
 
-    let paragraphs: Paragraph[];
-
-    if (templateText) {
-      const replacements: Record<string, string> = {
-        '{{TENANT_NAME}}': contract.tenantName,
-        '{{TENANT_EMAIL}}': contract.tenantEmail || 'N/A',
-        '{{TENANT_PHONE}}': contract.tenantPhone || 'N/A',
-        '{{PROPERTY_NAME}}': contract.property.name,
-        '{{PROPERTY_ADDRESS}}': contract.property.address || 'N/A',
-        '{{ZONE}}': (contract.property as any).zone?.name || 'N/A',
-        '{{START_DATE}}': formatDate(contract.startDate),
-        '{{END_DATE}}': formatDate(contract.endDate),
-        '{{MONTHLY_RENT}}': formatCurrency(contract.monthlyRent),
-        '{{ANNUAL_INCREMENT}}': `${contract.annualIncrement || 0}%`,
-        '{{DEPOSIT_AMOUNT}}': formatCurrency(contract.depositAmount || 0),
-        '{{REVIEW_DATE}}': contract.reviewDate ? formatDate(contract.reviewDate) : 'N/A',
-        '{{CURRENT_DATE}}': formatDate(new Date()),
-        '{{NOTES}}': contract.notes || '',
-      };
-
-      let processedText = templateText;
-      for (const [placeholder, value] of Object.entries(replacements)) {
-        processedText = processedText.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+    // Replace null values with PENDIENTE markers
+    for (const [search, replace] of Object.entries(replacements)) {
+      if (replace === null && processedText.includes(search)) {
+        const parts = processedText.split(search)
+        // Rebuild with PENDIENTE - we'll handle this in a simple way
+        processedText = processedText.split(search).join(`[PENDIENTE: ${search}]`)
       }
+    }
 
-      paragraphs = processedText.split('\n').map(
-        (line) =>
-          new Paragraph({
-            children: [new TextRun({ text: line, size: 24, font: 'Arial' })],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 120 },
-          })
-      );
+    // Check if text contains PENDIENTE markers
+    if (processedText.includes('[PENDIENTE:')) {
+      const regex = /\[PENDIENTE: ([^\]]+)\]/g
+      let lastIndex = 0
+      let match
+      while ((match = regex.exec(processedText)) !== null) {
+        // Text before PENDIENTE
+        if (match.index > lastIndex) {
+          children.push(normalRun(processedText.substring(lastIndex, match.index), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
+        }
+        // PENDIENTE marker
+        children.push(pendiente(match[1]))
+        lastIndex = match.index + match[0].length
+      }
+      // Text after last PENDIENTE
+      if (lastIndex < processedText.length) {
+        children.push(normalRun(processedText.substring(lastIndex), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
+      }
     } else {
-      const clauseNumber = { current: 1 };
+      children.push(normalRun(processedText, isClauseStart || isMainTitle || isDeclaraciones || isClausulas || isSectionHeader, isMainTitle ? 28 : 22))
+    }
 
-      const makeClause = (title: string, text: string): Paragraph => {
-        const num = clauseNumber.current++;
-        const ordinals = ['', 'PRIMERA', 'SEGUNDA', 'TERCERA', 'CUARTA', 'QUINTA', 'SEXTA', 'SÉPTIMA', 'OCTAVA', 'NOVENA', 'DÉCIMA'];
-        const ordinal = ordinals[num] || `CLÁUSULA ${num}`;
+    paragraphs.push(new Paragraph({
+      children,
+      alignment: isMainTitle ? AlignmentType.CENTER : AlignmentType.JUSTIFIED,
+      spacing: {
+        after: isMainTitle ? 300 : isDeclaraciones || isClausulas ? 200 : isClauseStart ? 150 : 80,
+        before: isClauseStart ? 100 : 0,
+      },
+      heading: isMainTitle ? HeadingLevel.HEADING_1 : undefined,
+    }))
+  }
 
-        return new Paragraph({
-          children: [
-            new TextRun({ text: `${ordinal}. ${title}. `, bold: true, size: 22, font: 'Arial' }),
-            new TextRun({ text, size: 22, font: 'Arial' }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 200 },
-        });
-      }
+  // Signature block
+  paragraphs.push(new Paragraph({ spacing: { before: 400, after: 200 } }))
 
-      paragraphs = [
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'CONTRATO DE ARRENDAMIENTO',
-              bold: true,
-              size: 32,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 400 },
-          heading: HeadingLevel.TITLE,
-        }),
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }
 
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `En la ciudad de México, a ${formatDate(new Date())}, celebran el presente contrato de arrendamiento, por una parte como ARRENDADOR (en lo sucesivo "EL ARRENDADOR") y por la otra parte:`,
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 200 },
-        }),
+  paragraphs.push(new Paragraph({
+    children: [],
+  }))
 
-        new Paragraph({
-          children: [
-            new TextRun({ text: `ARRENDATARIO: ${contract.tenantName}`, bold: true, size: 22, font: 'Arial' }),
-          ],
-          spacing: { after: 60 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: `Correo electrónico: ${contract.tenantEmail}`, size: 22, font: 'Arial' }),
-          ],
-          spacing: { after: 60 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: `Teléfono: ${contract.tenantPhone || 'N/A'}`, size: 22, font: 'Arial' }),
-          ],
-          spacing: { after: 200 },
-        }),
-
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: '(en lo sucesivo "EL ARRENDATARIO"), conforme a las siguientes:',
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          spacing: { after: 300 },
-        }),
-
-        new Paragraph({
-          children: [new TextRun({ text: 'DECLARACIONES', bold: true, size: 28, font: 'Arial' })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-          heading: HeadingLevel.HEADING_1,
-        }),
-
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'I. Declara EL ARRENDADOR ser legítimo propietario del inmueble objeto de este contrato.',
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 120 },
-        }),
-
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `II. Que el inmueble objeto de este contrato se ubica en: ${contract.property.address}${contract.property.zone ? `, Zona: ${contract.property.zone.name}` : ''}.`,
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 120 },
-        }),
-
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `III. Que el inmueble se identifica como: ${contract.property.name}.`,
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 300 },
-        }),
-
-        new Paragraph({
-          children: [new TextRun({ text: 'CLÁUSULAS', bold: true, size: 28, font: 'Arial' })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-          heading: HeadingLevel.HEADING_1,
-        }),
-
-        makeClause(
-          'OBJETO',
-          'EL ARRENDADOR concede en arrendamiento a EL ARRENDATARIO el inmueble descrito en las declaraciones del presente contrato, para uso habitacional o comercial según corresponda.'
-        ),
-
-        makeClause(
-          'VIGENCIA',
-          `El presente contrato tendrá una vigencia que comenzará el ${formatDate(contract.startDate)} y concluirá el ${formatDate(contract.endDate)}.`
-        ),
-
-        makeClause(
-          'RENTA',
-          `EL ARRENDATARIO se obliga a pagar como renta mensual la cantidad de ${formatCurrency(contract.monthlyRent)} (pesos mexicanos), pagadera por adelantado dentro de los primeros cinco días de cada mes.`
-        ),
-
-        makeClause(
-          'INCREMENTO ANUAL',
-          `Las partes acuerdan que la renta se incrementará anualmente en un ${contract.annualIncrement}% sobre el monto de la renta vigente.`
-        ),
-
-        makeClause(
-          'DEPÓSITO EN GARANTÍA',
-          `EL ARRENDATARIO entrega en este acto la cantidad de ${formatCurrency(contract.depositAmount)} (pesos mexicanos) como depósito en garantía, el cual será devuelto al término del contrato, previa verificación del estado del inmueble.`
-        ),
-
-        makeClause(
-          'OBLIGACIONES DEL ARRENDATARIO',
-          'EL ARRENDATARIO se obliga a: a) Pagar puntualmente la renta; b) Conservar el inmueble en buen estado; c) No subarrendar total ni parcialmente el inmueble; d) Permitir las visitas de inspección por parte del ARRENDADOR previo aviso.'
-        ),
-
-        makeClause(
-          'OBLIGACIONES DEL ARRENDADOR',
-          'EL ARRENDADOR se obliga a: a) Entregar el inmueble en condiciones óptimas de uso; b) Realizar las reparaciones mayores necesarias; c) Respetar el uso pacífico del inmueble por parte del ARRENDATARIO.'
-        ),
-      ];
-
-      if (contract.reviewDate) {
-        paragraphs.push(
-          makeClause(
-            'REVISIÓN',
-            `Las partes acuerdan realizar una revisión de las condiciones del presente contrato el día ${formatDate(contract.reviewDate)}.`
-          )
-        );
-      }
-
-      paragraphs.push(
-        makeClause(
-          'JURISDICCIÓN',
-          'Para la interpretación y cumplimiento de este contrato, las partes se someten a la jurisdicción de los tribunales competentes de la Ciudad de México, renunciando a cualquier otro fuero que por razón de su domicilio presente o futuro pudiera corresponderles.'
-        )
-      );
-
-      if (contract.notes) {
-        paragraphs.push(
-          new Paragraph({
+  // Signature table
+  const sigTable = new Table({
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
             children: [
-              new TextRun({ text: 'OBSERVACIONES: ', bold: true, size: 22, font: 'Arial' }),
-              new TextRun({ text: contract.notes, size: 22, font: 'Arial' }),
+              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({ children: [normalRun('LA SUBARRENDADORA', true, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({ children: [normalRun('ACK CIMENTACIONES S.A. DE C.V.', false, 18)], alignment: AlignmentType.CENTER }),
             ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { before: 200, after: 300 },
-          })
-        );
-      }
-
-      // Firmas
-      paragraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'Leído que fue el presente contrato, las partes lo firman de conformidad.',
-              size: 22,
-              font: 'Arial',
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 400, after: 600 },
-        }),
-
-        new Paragraph({
-          children: [],
-          spacing: { after: 200 },
-        }),
-
-        // Tabla de firmas
-        new Paragraph({ children: [] }), // espaciador
-      );
-
-      paragraphs.push(
-        new Paragraph({ children: [], spacing: { after: 400 } }),
-      );
-
-      // Firma del arrendador
-      const signatureTable = new Table({
-        rows: [
-          new TableRow({
+            borders: noBorders,
+            width: { size: 50, type: WidthType.PERCENTAGE },
+          }),
+          new TableCell({
             children: [
-              new TableCell({
-                children: [
-                  new Paragraph({
-                    children: [new TextRun({ text: '_______________________________', size: 22, font: 'Arial' })],
-                    alignment: AlignmentType.CENTER,
-                  }),
-                  new Paragraph({
-                    children: [new TextRun({ text: 'EL ARRENDADOR', bold: true, size: 22, font: 'Arial' })],
-                    alignment: AlignmentType.CENTER,
-                  }),
-                ],
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                borders: noBorder,
-              }),
-              new TableCell({
-                children: [
-                  new Paragraph({
-                    children: [new TextRun({ text: '_______________________________', size: 22, font: 'Arial' })],
-                    alignment: AlignmentType.CENTER,
-                  }),
-                  new Paragraph({
-                    children: [new TextRun({ text: 'EL ARRENDATARIO', bold: true, size: 22, font: 'Arial' })],
-                    alignment: AlignmentType.CENTER,
-                  }),
-                  new Paragraph({
-                    children: [new TextRun({ text: contract.tenantName, size: 22, font: 'Arial' })],
-                    alignment: AlignmentType.CENTER,
-                  }),
-                ],
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                borders: noBorder,
-              }),
+              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({ children: [normalRun('LA SUBARRENDATARIA', true, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({ children: [normalRun(contract.tenantName, false, 18)], alignment: AlignmentType.CENTER }),
             ],
+            borders: noBorders,
+            width: { size: 50, type: WidthType.PERCENTAGE },
           }),
         ],
-        width: { size: 100, type: WidthType.PERCENTAGE },
-      });
-
-      // Replace last empty paragraph with table
-      paragraphs.pop();
-      paragraphs.push(new Paragraph({ children: [] })); // We'll add table separately
-
-      // Build final children array including the table
-      const docChildren: (Paragraph | Table)[] = [...paragraphs, signatureTable];
-
-      const docWithTable = new Document({
-        sections: [
-          {
-            properties: {
-              page: {
-                margin: {
-                  top: 1440,
-                  right: 1440,
-                  bottom: 1440,
-                  left: 1440,
-                },
-              },
-            },
-            children: docChildren,
-          },
+      }),
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({ spacing: { before: 300 } }),
+              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({ children: [normalRun('EL FIADOR', true, 20)], alignment: AlignmentType.CENTER }),
+              new Paragraph({
+                children: [contract.fiadorName ? normalRun(contract.fiadorName, false, 18) : pendiente('NOMBRE DEL FIADOR')],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            borders: noBorders,
+            columnSpan: 2,
+          }),
         ],
-      });
+      }),
+    ],
+    width: { size: 100, type: WidthType.PERCENTAGE },
+  })
 
-      const buffer = await Packer.toBuffer(docWithTable);
-      const filename = `contrato_${contract.property.name.replace(/\s+/g, '_')}_${contract.tenantName.replace(/\s+/g, '_')}.docx`;
-
-      return new NextResponse(new Uint8Array(buffer), {
-        headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'Content-Disposition': `attachment; filename="${filename}"`,
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
         },
-      });
-    }
-
-    // If using template text, build simple document
-    const doc = new Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-            },
-          },
-          children: paragraphs,
-        },
-      ],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    const filename = `contrato_${contract.property.name.replace(/\s+/g, '_')}_${contract.tenantName.replace(/\s+/g, '_')}.docx`;
-
-    return new NextResponse(new Uint8Array(buffer), {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${filename}"`,
       },
-    });
-  } catch (error) {
-    console.error('Error al generar DOCX:', error);
-    return NextResponse.json(
-      { error: 'Error al generar el documento Word' },
-      { status: 500 }
-    );
-  }
+      children: [...paragraphs, sigTable],
+    }],
+  })
+
+  const buffer = await Packer.toBuffer(doc)
+  const filename = `Contrato_${contract.property.name.replace(/\s+/g, '_')}_${contract.tenantName.replace(/\s+/g, '_')}.docx`
+
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    },
+  })
 }
