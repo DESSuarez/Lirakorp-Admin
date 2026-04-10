@@ -35,6 +35,13 @@ export default function NewContractPage() {
     monthlyRent: '',
     annualIncrement: '5',
     depositAmount: '',
+    fiadorName: '',
+    fiadorProperty: '',
+    propertyInventory: '',
+    maintenanceFee: '',
+    signingCity: '',
+    signingTime: '10:00',
+    propertyUse: 'CASA HABITACION',
     notes: '',
   });
 
@@ -383,6 +390,126 @@ export default function NewContractPage() {
           </div>
         </fieldset>
 
+        {/* Fiador */}
+        <fieldset className="space-y-4">
+          <legend className="text-base font-semibold text-gray-900">Datos del Fiador</legend>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="fiadorName" className="block text-sm font-medium text-gray-700">
+                Nombre completo del Fiador
+              </label>
+              <input
+                type="text"
+                id="fiadorName"
+                name="fiadorName"
+                value={form.fiadorName}
+                onChange={handleChange}
+                placeholder="Ej: Juan Pérez López"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="fiadorProperty" className="block text-sm font-medium text-gray-700">
+                Propiedad del Fiador (garantía)
+              </label>
+              <textarea
+                id="fiadorProperty"
+                name="fiadorProperty"
+                rows={2}
+                value={form.fiadorProperty}
+                onChange={handleChange}
+                placeholder="Ej: Terreno en Valle de Banderas, 575 m2, escritura #1234..."
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Datos del inmueble para contrato */}
+        <fieldset className="space-y-4">
+          <legend className="text-base font-semibold text-gray-900">Datos del Inmueble para Contrato</legend>
+          <div>
+            <label htmlFor="propertyInventory" className="block text-sm font-medium text-gray-700">
+              Inventario / Características del inmueble
+            </label>
+            <textarea
+              id="propertyInventory"
+              name="propertyInventory"
+              rows={3}
+              value={form.propertyInventory}
+              onChange={handleChange}
+              placeholder="Ej: SALA-COMEDOR, COCINA INTEGRAL, 2 RECÁMARAS CON CLOSET, PATIO DE SERVICIO, 2 BAÑOS..."
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="maintenanceFee" className="block text-sm font-medium text-gray-700">
+                Cuota de mantenimiento (MXN/mes)
+              </label>
+              <input
+                type="number"
+                id="maintenanceFee"
+                name="maintenanceFee"
+                min="0"
+                step="0.01"
+                value={form.maintenanceFee}
+                onChange={handleChange}
+                placeholder="300"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="propertyUse" className="block text-sm font-medium text-gray-700">
+                Uso autorizado del inmueble
+              </label>
+              <input
+                type="text"
+                id="propertyUse"
+                name="propertyUse"
+                value={form.propertyUse}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Datos de firma */}
+        <fieldset className="space-y-4">
+          <legend className="text-base font-semibold text-gray-900">Datos de Firma</legend>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="signingCity" className="block text-sm font-medium text-gray-700">
+                Ciudad de firma
+              </label>
+              <input
+                type="text"
+                id="signingCity"
+                name="signingCity"
+                value={form.signingCity}
+                onChange={handleChange}
+                placeholder="Ej: Puerto Vallarta, Jalisco"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="signingTime" className="block text-sm font-medium text-gray-700">
+                Hora de firma
+              </label>
+              <input
+                type="text"
+                id="signingTime"
+                name="signingTime"
+                value={form.signingTime}
+                onChange={handleChange}
+                placeholder="10:00"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+          </div>
+        </fieldset>
+
         {/* Notas */}
         <div>
           <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
@@ -391,7 +518,7 @@ export default function NewContractPage() {
           <textarea
             id="notes"
             name="notes"
-            rows={4}
+            rows={3}
             value={form.notes}
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"

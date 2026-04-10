@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
 
     const {
       propertyId,
+      contractType,
       tenantName,
       tenantEmail,
       tenantPhone,
@@ -67,6 +68,13 @@ export async function POST(request: NextRequest) {
       monthlyRent,
       annualIncrement,
       depositAmount,
+      fiadorName,
+      fiadorProperty,
+      propertyInventory,
+      maintenanceFee,
+      signingCity,
+      signingTime,
+      propertyUse,
       notes,
     } = body;
 
@@ -94,6 +102,7 @@ export async function POST(request: NextRequest) {
       const newContract = await tx.contract.create({
         data: {
           propertyId,
+          contractType: contractType || 'arrendamiento',
           tenantName,
           tenantEmail,
           tenantPhone: tenantPhone || null,
@@ -104,6 +113,13 @@ export async function POST(request: NextRequest) {
           monthlyRent,
           annualIncrement: annualIncrement || 0,
           depositAmount,
+          fiadorName: fiadorName || null,
+          fiadorProperty: fiadorProperty || null,
+          propertyInventory: propertyInventory || null,
+          maintenanceFee: maintenanceFee ? Number(maintenanceFee) : null,
+          signingCity: signingCity || null,
+          signingTime: signingTime || null,
+          propertyUse: propertyUse || 'CASA HABITACION',
           notes: notes || null,
           status: 'active',
         },

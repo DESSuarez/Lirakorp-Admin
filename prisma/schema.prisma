@@ -63,6 +63,15 @@ model Contract {
   depositAmount     Float?
   contractType      String    @default("arrendamiento") // arrendamiento, comodato, temporal, comercial
   status            String    @default("active") // "active", "expired", "pending_renewal", "cancelled"
+  // Datos del fiador
+  fiadorName        String?   // Nombre completo del fiador
+  fiadorProperty    String?   // Descripcion de la propiedad del fiador (escritura, ubicacion, medidas)
+  // Datos adicionales del contrato
+  propertyInventory String?   // Inventario/caracteristicas del inmueble
+  maintenanceFee    Float?    // Cuota de mantenimiento de areas comunes
+  signingCity       String?   // Ciudad donde se firma el contrato
+  signingTime       String?   // Hora de firma del contrato
+  propertyUse       String?   @default("CASA HABITACION") // Uso autorizado del inmueble
   notes             String?
   contractFileUrl   String?   // URL del archivo de contrato subido (PDF/Word)
   contractFileName  String?   // nombre original del archivo

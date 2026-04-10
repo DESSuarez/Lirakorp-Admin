@@ -1,307 +1,311 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import PDFDocument from 'pdfkit';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { differenceInMonths } from 'date-fns'
 
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
+// Simple PDF builder (same as availability)
+const PW = 612, PH = 792, M = 60, CW = PW - 2 * M
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+class PDF {
+  private pageStreams: string[] = []
+  private currentStream = ''
+  private curY = PH - M
+
+  get y() { return this.curY }
+  set y(v: number) { this.curY = v }
+
+  private esc(t: string) {
+    return t.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
   }
 
-  const { id } = await params;
+  text(t: string, x: number, size: number, bold = false, r = 0, g = 0, b = 0) {
+    this.currentStream += `BT ${bold ? '/F2' : '/F1'} ${size} Tf ${r} ${g} ${b} rg ${x} ${this.curY} Td (${this.esc(t)}) Tj ET\n`
+  }
 
-  try {
-    const contract = await prisma.contract.findUnique({
-      where: { id },
-      include: {
-        property: {
-          include: { zone: true },
-        },
-      },
-    });
+  rect(x: number, yy: number, w: number, h: number, r: number, g: number, b: number) {
+    this.currentStream += `${r} ${g} ${b} rg ${x} ${yy} ${w} ${h} re f\n`
+  }
 
-    if (!contract) {
-      return NextResponse.json(
-        { error: 'Contrato no encontrado' },
-        { status: 404 }
-      );
+  line(x1: number, yy: number, x2: number, r: number, g: number, b: number, w = 0.5) {
+    this.currentStream += `${r} ${g} ${b} RG ${w} w ${x1} ${yy} m ${x2} ${yy} l S\n`
+  }
+
+  checkSpace(needed: number) {
+    if (this.curY - needed < M) {
+      this.newPage()
     }
+  }
 
-    // Buscar plantilla de contrato en BD
-    let templateText: string | null = null;
-    try {
-      const template = await prisma.contractTemplate.findFirst({
-        where: { isActive: true },
-      });
-      templateText = template?.content || null;
-    } catch {
-      // Si no existe el modelo ContractTemplate, usar plantilla por defecto
-    }
+  newPage() {
+    if (this.currentStream) this.pageStreams.push(this.currentStream)
+    this.currentStream = ''
+    this.curY = PH - M
+  }
 
-    const doc = new PDFDocument({
-      size: 'LETTER',
-      margins: { top: 72, bottom: 72, left: 72, right: 72 },
-    });
+  // Write a paragraph with word wrap
+  paragraph(t: string, x: number, maxWidth: number, size: number, bold = false, r = 0, g = 0, b = 0, lineHeight = 14) {
+    const avgCharWidth = size * 0.45
+    const maxChars = Math.floor(maxWidth / avgCharWidth)
+    const words = t.split(/\s+/)
+    let curLine = ''
 
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-
-    const pdfPromise = new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-
-    if (templateText) {
-      // Reemplazar placeholders en la plantilla
-      const replacements: Record<string, string> = {
-        '{{TENANT_NAME}}': contract.tenantName,
-        '{{TENANT_EMAIL}}': contract.tenantEmail || 'N/A',
-        '{{TENANT_PHONE}}': contract.tenantPhone || 'N/A',
-        '{{PROPERTY_NAME}}': contract.property.name,
-        '{{PROPERTY_ADDRESS}}': contract.property.address || 'N/A',
-        '{{ZONE}}': (contract.property as any).zone?.name || 'N/A',
-        '{{START_DATE}}': formatDate(contract.startDate),
-        '{{END_DATE}}': formatDate(contract.endDate),
-        '{{MONTHLY_RENT}}': formatCurrency(contract.monthlyRent),
-        '{{ANNUAL_INCREMENT}}': `${contract.annualIncrement || 0}%`,
-        '{{DEPOSIT_AMOUNT}}': formatCurrency(contract.depositAmount || 0),
-        '{{REVIEW_DATE}}': contract.reviewDate ? formatDate(contract.reviewDate) : 'N/A',
-        '{{CURRENT_DATE}}': formatDate(new Date()),
-        '{{NOTES}}': contract.notes || '',
-      };
-
-      let processedText = templateText;
-      for (const [placeholder, value] of Object.entries(replacements)) {
-        processedText = processedText.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+    for (const word of words) {
+      if ((curLine + ' ' + word).length > maxChars && curLine) {
+        this.checkSpace(lineHeight + 5)
+        this.text(curLine.trim(), x, size, bold, r, g, b)
+        this.curY -= lineHeight
+        curLine = word
+      } else {
+        curLine = curLine ? curLine + ' ' + word : word
       }
+    }
+    if (curLine.trim()) {
+      this.checkSpace(lineHeight + 5)
+      this.text(curLine.trim(), x, size, bold, r, g, b)
+      this.curY -= lineHeight
+    }
+  }
 
-      doc.fontSize(12).text(processedText, { align: 'justify' });
+  build(): Buffer {
+    if (this.currentStream) this.pageStreams.push(this.currentStream)
+    const numPages = this.pageStreams.length
+    const imgBaseObj = 5
+    const pageBaseObj = imgBaseObj
+
+    const parts: Buffer[] = []
+    const offsets: number[] = []
+    let pos = 0
+
+    function write(s: string) { const b = Buffer.from(s, 'latin1'); parts.push(b); pos += b.length }
+    function writeBin(b: Buffer) { parts.push(b); pos += b.length }
+    function markOffset() { offsets.push(pos) }
+
+    write('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n')
+
+    markOffset()
+    write('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+
+    markOffset()
+    const kids = []
+    for (let i = 0; i < numPages; i++) kids.push(`${pageBaseObj + i * 2 + 1} 0 R`)
+    write(`2 0 obj\n<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${numPages} >>\nendobj\n`)
+
+    markOffset()
+    write('3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n')
+
+    markOffset()
+    write('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n')
+
+    for (let i = 0; i < numPages; i++) {
+      const streamObjNum = pageBaseObj + i * 2
+      const pageObjNum = pageBaseObj + i * 2 + 1
+      const content = this.pageStreams[i]
+      const contentBuf = Buffer.from(content, 'latin1')
+
+      markOffset()
+      write(`${streamObjNum} 0 obj\n<< /Length ${contentBuf.length} >>\nstream\n`)
+      writeBin(contentBuf)
+      write('\nendstream\nendobj\n')
+
+      markOffset()
+      write(`${pageObjNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Contents ${streamObjNum} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>\nendobj\n`)
+    }
+
+    const xrefPos = pos
+    const totalObjs = offsets.length + 1
+    write(`xref\n0 ${totalObjs}\n0000000000 65535 f \n`)
+    for (const off of offsets) write(String(off).padStart(10, '0') + ' 00000 n \n')
+    write(`trailer\n<< /Size ${totalObjs} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`)
+
+    return Buffer.concat(parts)
+  }
+}
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { id } = await params
+
+  const contract = await prisma.contract.findUnique({
+    where: { id },
+    include: { property: { include: { zone: true } } },
+  })
+
+  if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
+
+  // Find template: first by zone, then general
+  let template = await prisma.contractTemplate.findFirst({
+    where: { zoneId: contract.property.zoneId, isActive: true },
+    orderBy: { year: 'desc' },
+  })
+  if (!template) {
+    template = await prisma.contractTemplate.findFirst({
+      where: { zoneId: null, isActive: true },
+      orderBy: { year: 'desc' },
+    })
+  }
+
+  const months = differenceInMonths(contract.endDate, contract.startDate)
+
+  // Build replacements map
+  const replacements: Record<string, string> = {
+    // Inquilino
+    'LUIS MIGUEL ARIZA JIMENEZ': contract.tenantName,
+    'MICA IMELY': contract.tenantName,
+    // Fiador
+    'ALICIA DIAZ NAVEZ': contract.fiadorName || '________________________',
+    'LUIS FACUNDO IMELY': contract.fiadorName || '________________________',
+    // Renta
+    '$7,900.00': formatCurrency(contract.monthlyRent),
+    'SIETE MIL NOVECIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '$7,900.00  (SIETE MIL NOVECIENTOS PESOS 00/100 M.N.)': `${formatCurrency(contract.monthlyRent)} (${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N.)`,
+    // Fechas
+    '15 de Diciembre del año 2025 dos mil veinticinco': formatDate(contract.startDate),
+    '15 de Diciembre  de  2025': formatDate(contract.startDate),
+    '14 de Diciembre 2026': formatDate(contract.endDate),
+    '14 DE Diciembre  de  2026': formatDate(contract.endDate),
+    '11 de Diciembre de 2025 dos mil veinticinco': formatDate(contract.startDate),
+    // Departamento
+    'DEPARTAMENTO # 08': `DEPARTAMENTO # ${contract.property.number}`,
+  }
+
+  const pdf = new PDF()
+
+  if (template) {
+    // Use template content with replacements
+    let content = template.content
+
+    // Apply replacements
+    for (const [search, replace] of Object.entries(replacements)) {
+      content = content.split(search).join(replace)
+    }
+
+    // Split into paragraphs and render
+    const paragraphs = content.split('\n').filter(p => p.trim())
+
+    for (const para of paragraphs) {
+      const trimmed = para.trim()
+      if (!trimmed) continue
+
+      // Detect headers/titles
+      const isTitle = trimmed === trimmed.toUpperCase() && trimmed.length < 60 && !trimmed.startsWith('-')
+      const isClause = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|SEPTIMA|SÉPTIMA|OCTAVA|NOVENA|DECIMA|DÉCIMA|VIGESI|C\s*L\s*A\s*U\s*S\s*U\s*L\s*A\s*S|D\s*E\s*C\s*L\s*A\s*R\s*A\s*C\s*I\s*O\s*N\s*E\s*S)/.test(trimmed)
+      const isMainTitle = trimmed.includes('CONTRATO DE SUBARRENDAMIENTO') && trimmed.length < 40
+
+      if (isMainTitle) {
+        pdf.checkSpace(40)
+        pdf.y -= 10
+        pdf.text(trimmed, M, 14, true, 0.1, 0.1, 0.1)
+        pdf.y -= 20
+      } else if (isClause || (isTitle && trimmed.length > 5)) {
+        pdf.checkSpace(25)
+        pdf.y -= 8
+        pdf.text(trimmed.substring(0, 90), M, 10, true, 0.1, 0.1, 0.1)
+        if (trimmed.length > 90) {
+          pdf.y -= 12
+          pdf.text(trimmed.substring(90), M, 10, true, 0.1, 0.1, 0.1)
+        }
+        pdf.y -= 5
+      } else {
+        pdf.paragraph(trimmed, M, CW, 9, false, 0.15, 0.15, 0.15, 12)
+        pdf.y -= 4
+      }
+    }
+
+    // Signature block
+    pdf.checkSpace(100)
+    pdf.y -= 30
+    pdf.line(M, pdf.y, PW - M, 0.8, 0.8, 0.8, 0.5)
+    pdf.y -= 30
+
+    pdf.text('LA SUBARRENDADORA', M, 9, true, 0.1, 0.1, 0.1)
+    pdf.text('LA SUBARRENDATARIA', M + CW / 2, 9, true, 0.1, 0.1, 0.1)
+    pdf.y -= 30
+    pdf.line(M, pdf.y, M + 180, 0.3, 0.3, 0.3, 0.5)
+    pdf.line(M + CW / 2, pdf.y, M + CW / 2 + 180, 0.3, 0.3, 0.3, 0.5)
+    pdf.y -= 12
+    pdf.text('ACK CIMENTACIONES S.A. DE C.V.', M, 8, false, 0.3, 0.3, 0.3)
+    pdf.text(contract.tenantName, M + CW / 2, 8, false, 0.3, 0.3, 0.3)
+
+    if (contract.fiadorName) {
+      pdf.y -= 30
+      pdf.text('EL FIADOR', M + CW / 4, 9, true, 0.1, 0.1, 0.1)
+      pdf.y -= 30
+      pdf.line(M + CW / 4, pdf.y, M + CW / 4 + 180, 0.3, 0.3, 0.3, 0.5)
+      pdf.y -= 12
+      pdf.text(contract.fiadorName, M + CW / 4, 8, false, 0.3, 0.3, 0.3)
+    }
+  } else {
+    // No template - generate basic contract
+    pdf.text('CONTRATO DE SUBARRENDAMIENTO', M, 14, true, 0.1, 0.1, 0.1)
+    pdf.y -= 25
+    pdf.paragraph(`No se encontro plantilla para la zona "${contract.property.zone.name}". Por favor, suba una plantilla en la seccion de Plantillas.`, M, CW, 11, false, 0.5, 0.1, 0.1)
+  }
+
+  const pdfBuffer = pdf.build()
+  const filename = `Contrato_${contract.property.name.replace(/\s+/g, '_')}_${contract.tenantName.replace(/\s+/g, '_')}.pdf`
+
+  return new NextResponse(new Uint8Array(pdfBuffer), {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    },
+  })
+}
+
+function numberToWords(n: number): string {
+  const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
+  const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE']
+  const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
+  const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
+
+  const num = Math.floor(n)
+  if (num === 0) return 'CERO'
+  if (num === 100) return 'CIEN'
+
+  let result = ''
+  const thousands = Math.floor(num / 1000)
+  const remainder = num % 1000
+
+  if (thousands > 0) {
+    if (thousands === 1) result += 'MIL '
+    else {
+      const th = convertHundreds(thousands)
+      result += th + ' MIL '
+    }
+  }
+
+  if (remainder > 0) {
+    result += convertHundreds(remainder)
+  }
+
+  return result.trim()
+
+  function convertHundreds(n: number): string {
+    if (n === 0) return ''
+    if (n === 100) return 'CIEN'
+
+    let r = ''
+    const h = Math.floor(n / 100)
+    const t = n % 100
+
+    if (h > 0) r += hundreds[h] + ' '
+
+    if (t >= 10 && t <= 19) {
+      r += teens[t - 10]
+    } else if (t >= 20 && t <= 29 && t !== 20) {
+      r += 'VEINTI' + units[t - 20]
     } else {
-      // Plantilla por defecto: formato de contrato mexicano
-      doc
-        .fontSize(16)
-        .font('Helvetica-Bold')
-        .text('CONTRATO DE ARRENDAMIENTO', { align: 'center' })
-        .moveDown(2);
-
-      doc
-        .fontSize(10)
-        .font('Helvetica')
-        .text(
-          `En la ciudad de México, a ${formatDate(new Date())}, celebran el presente contrato de arrendamiento, por una parte como ARRENDADOR (en lo sucesivo "EL ARRENDADOR") y por la otra parte:`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text(`ARRENDATARIO: ${contract.tenantName}`, { align: 'left' })
-        .font('Helvetica')
-        .text(`Correo electrónico: ${contract.tenantEmail}`)
-        .text(`Teléfono: ${contract.tenantPhone || 'N/A'}`)
-        .moveDown();
-
-      doc
-        .text('(en lo sucesivo "EL ARRENDATARIO"), conforme a las siguientes:')
-        .moveDown();
-
-      doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text('DECLARACIONES', { align: 'center' })
-        .moveDown()
-        .fontSize(10)
-        .font('Helvetica');
-
-      doc
-        .text(
-          'I. Declara EL ARRENDADOR ser legítimo propietario del inmueble objeto de este contrato.',
-          { align: 'justify' }
-        )
-        .moveDown(0.5);
-
-      doc
-        .text(
-          `II. Que el inmueble objeto de este contrato se ubica en: ${contract.property.address}${contract.property.zone ? `, Zona: ${contract.property.zone.name}` : ''}.`,
-          { align: 'justify' }
-        )
-        .moveDown(0.5);
-
-      doc
-        .text(
-          `III. Que el inmueble se identifica como: ${contract.property.name}.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text('CLÁUSULAS', { align: 'center' })
-        .moveDown()
-        .fontSize(10)
-        .font('Helvetica');
-
-      doc
-        .font('Helvetica-Bold')
-        .text('PRIMERA. OBJETO. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          `EL ARRENDADOR concede en arrendamiento a EL ARRENDATARIO el inmueble descrito en las declaraciones del presente contrato, para uso habitacional o comercial según corresponda.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('SEGUNDA. VIGENCIA. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          `El presente contrato tendrá una vigencia que comenzará el ${formatDate(contract.startDate)} y concluirá el ${formatDate(contract.endDate)}.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('TERCERA. RENTA. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          `EL ARRENDATARIO se obliga a pagar como renta mensual la cantidad de ${formatCurrency(contract.monthlyRent)} (pesos mexicanos), pagadera por adelantado dentro de los primeros cinco días de cada mes.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('CUARTA. INCREMENTO ANUAL. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          `Las partes acuerdan que la renta se incrementará anualmente en un ${contract.annualIncrement}% sobre el monto de la renta vigente.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('QUINTA. DEPÓSITO EN GARANTÍA. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          `EL ARRENDATARIO entrega en este acto la cantidad de ${formatCurrency(contract.depositAmount)} (pesos mexicanos) como depósito en garantía, el cual será devuelto al término del contrato, previa verificación del estado del inmueble.`,
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('SEXTA. OBLIGACIONES DEL ARRENDATARIO. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          'EL ARRENDATARIO se obliga a: a) Pagar puntualmente la renta; b) Conservar el inmueble en buen estado; c) No subarrendar total ni parcialmente el inmueble; d) Permitir las visitas de inspección por parte del ARRENDADOR previo aviso.',
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      doc
-        .font('Helvetica-Bold')
-        .text('SÉPTIMA. OBLIGACIONES DEL ARRENDADOR. ', { continued: true })
-        .font('Helvetica')
-        .text(
-          'EL ARRENDADOR se obliga a: a) Entregar el inmueble en condiciones óptimas de uso; b) Realizar las reparaciones mayores necesarias; c) Respetar el uso pacífico del inmueble por parte del ARRENDATARIO.',
-          { align: 'justify' }
-        )
-        .moveDown();
-
-      if (contract.reviewDate) {
-        doc
-          .font('Helvetica-Bold')
-          .text('OCTAVA. REVISIÓN. ', { continued: true })
-          .font('Helvetica')
-          .text(
-            `Las partes acuerdan realizar una revisión de las condiciones del presente contrato el día ${formatDate(contract.reviewDate)}.`,
-            { align: 'justify' }
-          )
-          .moveDown();
-      }
-
-      doc
-        .font('Helvetica-Bold')
-        .text(`${contract.reviewDate ? 'NOVENA' : 'OCTAVA'}. JURISDICCIÓN. `, { continued: true })
-        .font('Helvetica')
-        .text(
-          'Para la interpretación y cumplimiento de este contrato, las partes se someten a la jurisdicción de los tribunales competentes de la Ciudad de México, renunciando a cualquier otro fuero que por razón de su domicilio presente o futuro pudiera corresponderles.',
-          { align: 'justify' }
-        )
-        .moveDown(2);
-
-      if (contract.notes) {
-        doc
-          .font('Helvetica-Bold')
-          .text('OBSERVACIONES:', { align: 'left' })
-          .font('Helvetica')
-          .text(contract.notes, { align: 'justify' })
-          .moveDown(2);
-      }
-
-      // Firmas
-      doc
-        .text('Leído que fue el presente contrato, las partes lo firman de conformidad.', {
-          align: 'center',
-        })
-        .moveDown(3);
-
-      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const colWidth = pageWidth / 2 - 20;
-
-      const y = doc.y;
-
-      doc
-        .text('_______________________________', doc.page.margins.left, y, {
-          width: colWidth,
-          align: 'center',
-        })
-        .text('EL ARRENDADOR', doc.page.margins.left, y + 15, {
-          width: colWidth,
-          align: 'center',
-        });
-
-      doc
-        .text('_______________________________', doc.page.margins.left + colWidth + 40, y, {
-          width: colWidth,
-          align: 'center',
-        })
-        .text('EL ARRENDATARIO', doc.page.margins.left + colWidth + 40, y + 15, {
-          width: colWidth,
-          align: 'center',
-        })
-        .text(contract.tenantName, doc.page.margins.left + colWidth + 40, y + 30, {
-          width: colWidth,
-          align: 'center',
-        });
+      const d = Math.floor(t / 10)
+      const u = t % 10
+      if (d > 0) r += tens[d]
+      if (d > 0 && u > 0) r += ' Y '
+      if (u > 0) r += units[u]
     }
 
-    doc.end();
-    const pdfBuffer = await pdfPromise;
-
-    const filename = `contrato_${contract.property.name.replace(/\s+/g, '_')}_${contract.tenantName.replace(/\s+/g, '_')}.pdf`;
-
-    return new NextResponse(new Uint8Array(pdfBuffer), {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    });
-  } catch (error) {
-    console.error('Error al generar PDF:', error);
-    return NextResponse.json(
-      { error: 'Error al generar el PDF' },
-      { status: 500 }
-    );
+    return r.trim()
   }
 }
