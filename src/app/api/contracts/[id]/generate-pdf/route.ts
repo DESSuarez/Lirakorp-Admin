@@ -44,27 +44,36 @@ class PDF {
     this.curY = PH - M
   }
 
-  // Write a paragraph with word wrap
-  paragraph(t: string, x: number, maxWidth: number, size: number, bold = false, r = 0, g = 0, b = 0, lineHeight = 14) {
-    const avgCharWidth = size * 0.45
+  // Write a paragraph with word wrap - uses character width estimation
+  paragraph(t: string, x: number, maxWidth: number, size: number, bold = false, r = 0, g = 0, b = 0, lineHeight?: number) {
+    const lh = lineHeight || size * 1.4
+    const avgCharWidth = size * (bold ? 0.52 : 0.47)
     const maxChars = Math.floor(maxWidth / avgCharWidth)
-    const words = t.split(/\s+/)
+    const words = t.split(/\s+/).filter(w => w)
     let curLine = ''
 
     for (const word of words) {
-      if ((curLine + ' ' + word).length > maxChars && curLine) {
-        this.checkSpace(lineHeight + 5)
-        this.text(curLine.trim(), x, size, bold, r, g, b)
-        this.curY -= lineHeight
+      const testLine = curLine ? curLine + ' ' + word : word
+      if (testLine.length > maxChars && curLine) {
+        this.checkSpace(lh + 2)
+        this.text(curLine, x, size, bold, r, g, b)
+        this.curY -= lh
         curLine = word
+        // Handle single words longer than max
+        while (curLine.length > maxChars) {
+          this.checkSpace(lh + 2)
+          this.text(curLine.substring(0, maxChars), x, size, bold, r, g, b)
+          this.curY -= lh
+          curLine = curLine.substring(maxChars)
+        }
       } else {
-        curLine = curLine ? curLine + ' ' + word : word
+        curLine = testLine
       }
     }
-    if (curLine.trim()) {
-      this.checkSpace(lineHeight + 5)
-      this.text(curLine.trim(), x, size, bold, r, g, b)
-      this.curY -= lineHeight
+    if (curLine) {
+      this.checkSpace(lh + 2)
+      this.text(curLine, x, size, bold, r, g, b)
+      this.curY -= lh
     }
   }
 
@@ -184,34 +193,50 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Split into paragraphs and render
-    const paragraphs = content.split('\n').filter(p => p.trim())
+    const paragraphs = content.split('\n')
 
     for (const para of paragraphs) {
       const trimmed = para.trim()
-      if (!trimmed) continue
+      if (!trimmed) {
+        pdf.y -= 6 // blank line spacing
+        continue
+      }
 
-      // Detect headers/titles
-      const isTitle = trimmed === trimmed.toUpperCase() && trimmed.length < 60 && !trimmed.startsWith('-')
-      const isClause = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|SEPTIMA|SÉPTIMA|OCTAVA|NOVENA|DECIMA|DÉCIMA|VIGESI|C\s*L\s*A\s*U\s*S\s*U\s*L\s*A\s*S|D\s*E\s*C\s*L\s*A\s*R\s*A\s*C\s*I\s*O\s*N\s*E\s*S)/.test(trimmed)
-      const isMainTitle = trimmed.includes('CONTRATO DE SUBARRENDAMIENTO') && trimmed.length < 40
+      // Detect content types
+      const isMainTitle = trimmed.includes('CONTRATO DE SUBARRENDAMIENTO') && trimmed.length < 45
+      const isDeclaraciones = /^D\s*E\s*C\s*L\s*A\s*R\s*A\s*C\s*I\s*O\s*N\s*E\s*S/.test(trimmed)
+      const isClausulas = /^C\s*L\s*A\s*U\s*S\s*U\s*L\s*A\s*S/.test(trimmed)
+      const isClauseStart = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|S[EÉ]PTIMA|OCTAVA|NOVENA|D[EÉ]CIMA|VIG[EÉ]SI)/.test(trimmed)
+      const isSectionHeader = /^[IVX]+\.\s*(DECLARA|FIADOR)/.test(trimmed) || /^\d+\.\-/.test(trimmed)
+      const isSubItem = /^[A-H]\)\.\-|^[A-H]\)\.-|^[a-h]\)/.test(trimmed)
 
       if (isMainTitle) {
-        pdf.checkSpace(40)
+        pdf.checkSpace(35)
+        pdf.y -= 8
+        pdf.paragraph(trimmed, M, CW, 13, true, 0.1, 0.1, 0.1)
         pdf.y -= 10
-        pdf.text(trimmed, M, 14, true, 0.1, 0.1, 0.1)
-        pdf.y -= 20
-      } else if (isClause || (isTitle && trimmed.length > 5)) {
+      } else if (isDeclaraciones || isClausulas) {
+        pdf.checkSpace(30)
+        pdf.y -= 12
+        pdf.paragraph(trimmed, M, CW, 11, true, 0.1, 0.1, 0.1)
+        pdf.y -= 8
+      } else if (isClauseStart) {
         pdf.checkSpace(25)
         pdf.y -= 8
-        pdf.text(trimmed.substring(0, 90), M, 10, true, 0.1, 0.1, 0.1)
-        if (trimmed.length > 90) {
-          pdf.y -= 12
-          pdf.text(trimmed.substring(90), M, 10, true, 0.1, 0.1, 0.1)
-        }
-        pdf.y -= 5
+        pdf.paragraph(trimmed, M, CW, 9, true, 0.1, 0.1, 0.1)
+        pdf.y -= 3
+      } else if (isSectionHeader) {
+        pdf.checkSpace(22)
+        pdf.y -= 6
+        pdf.paragraph(trimmed, M, CW, 9.5, true, 0.15, 0.15, 0.15)
+        pdf.y -= 3
+      } else if (isSubItem) {
+        pdf.checkSpace(15)
+        pdf.paragraph(trimmed, M + 15, CW - 15, 8.5, false, 0.2, 0.2, 0.2)
+        pdf.y -= 2
       } else {
-        pdf.paragraph(trimmed, M, CW, 9, false, 0.15, 0.15, 0.15, 12)
-        pdf.y -= 4
+        pdf.paragraph(trimmed, M, CW, 8.5, false, 0.18, 0.18, 0.18)
+        pdf.y -= 2
       }
     }
 
