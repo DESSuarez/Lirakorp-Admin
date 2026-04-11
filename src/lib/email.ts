@@ -11,10 +11,14 @@ const transporter = nodemailer.createTransport({
 })
 
 export async function sendEmail(to: string, subject: string, html: string, attachments?: { filename: string; path: string }[]) {
+  const testOverride = process.env.TEST_EMAIL_OVERRIDE
+  const actualTo = testOverride || to
+  const actualSubject = testOverride ? `[TEST → ${to}] ${subject}` : subject
+
   return transporter.sendMail({
     from: process.env.EMAIL_FROM,
-    to,
-    subject,
+    to: actualTo,
+    subject: actualSubject,
     html,
     attachments,
   })
