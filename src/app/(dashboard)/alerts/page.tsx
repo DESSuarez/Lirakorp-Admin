@@ -11,6 +11,12 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   rent_review: 'Revision de Renta',
   renewal_contact: 'Contactar Inquilino',
   payment_due: 'Pago Pendiente',
+  contract_uploaded: 'Contrato Subido',
+}
+
+const RECIPIENT_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  tenant: 'Inquilino',
 }
 
 function getUrgencyStyles(dueDate: Date) {
@@ -155,6 +161,9 @@ export default async function AlertsPage({
                       <span className={`badge ${urgency.badge}`}>{urgency.label}</span>
                       <span className="badge bg-gray-100 text-gray-700">
                         {ALERT_TYPE_LABELS[alert.type] || alert.type}
+                      </span>
+                      <span className={`badge ${(alert as any).recipientType === 'tenant' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {RECIPIENT_LABELS[(alert as any).recipientType] || 'Admin'}
                       </span>
                     </div>
 

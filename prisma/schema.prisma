@@ -75,6 +75,10 @@ model Contract {
   notes             String?
   contractFileUrl   String?   // URL del archivo de contrato subido (PDF/Word)
   contractFileName  String?   // nombre original del archivo
+  // Renovación
+  renewalToken      String?   @unique // token para que el inquilino responda sin login
+  renewalResponse   String?   // "wants_renewal", "no_renewal", null (sin respuesta)
+  renewalRespondedAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   alerts            Alert[]
@@ -91,18 +95,20 @@ model Photo {
 }
 
 model Alert {
-  id          String    @id @default(cuid())
-  type        String    // "contract_expiry", "rent_review", "renewal_contact", "payment_due"
-  title       String
-  message     String
-  dueDate     DateTime
-  status      String    @default("pending") // "pending", "sent", "dismissed"
-  contractId  String?
-  contract    Contract? @relation(fields: [contractId], references: [id])
-  sentEmail   Boolean   @default(false)
-  sentWhatsapp Boolean  @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  type          String    // "contract_expiry", "rent_review", "renewal_contact", "payment_due", "contract_uploaded"
+  recipientType String   @default("admin") // "admin" o "tenant"
+  title         String
+  message       String
+  dueDate       DateTime
+  status        String    @default("pending") // "pending", "sent", "dismissed"
+  contractId    String?
+  contract      Contract? @relation(fields: [contractId], references: [id])
+  sentEmail     Boolean   @default(false)
+  sentWhatsapp  Boolean   @default(false)
+  triggerDaysBefore Int?  // 30, 7, 0 (para control de periodicidad)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model ContractTemplate {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
           propertyUse: propertyUse || 'CASA HABITACION',
           notes: notes || null,
           status: 'active',
+          renewalToken: crypto.randomBytes(32).toString('hex'),
         },
         include: {
           property: {
