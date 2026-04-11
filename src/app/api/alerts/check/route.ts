@@ -6,7 +6,6 @@ import {
   sendEmail,
   buildAdminRenewalContactEmail,
   buildAdminExpiryEmail,
-  buildTenantRenewalEmail,
 } from '@/lib/email';
 import { daysUntil } from '@/lib/utils';
 
@@ -25,7 +24,6 @@ export async function POST() {
     const adminEmail = session.user?.email;
     let createdCount = 0;
     let emailsSent = 0;
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
     for (const contract of activeContracts) {
       if (!contract.endDate) continue;
@@ -86,58 +84,6 @@ export async function POST() {
       }
 
       // ═══════════════════════════════════════════
-      // ALERTA 30 DÍAS - INQUILINO: Se acerca renovación con botones
-      // ═══════════════════════════════════════════
-      if (daysLeft > 0 && daysLeft <= 30) {
-        const exists30Tenant = await prisma.alert.findFirst({
-          where: {
-            contractId: contract.id,
-            recipientType: 'tenant',
-            triggerDaysBefore: 30,
-            type: 'contract_expiry',
-            status: { not: 'dismissed' },
-          },
-        });
-
-        if (!exists30Tenant) {
-          await prisma.alert.create({
-            data: {
-              type: 'contract_expiry',
-              recipientType: 'tenant',
-              triggerDaysBefore: 30,
-              title: `Renovación próxima - ${propertyName}`,
-              message: `${tenantName}, su contrato en ${propertyName} vence el ${endDateStr}. Por favor indique si desea renovar.`,
-              dueDate: new Date(contract.endDate.getTime() - 30 * 24 * 60 * 60 * 1000),
-              contractId: contract.id,
-            },
-          });
-          createdCount++;
-
-          // Enviar email al inquilino con botones
-          if (contract.tenantEmail && contract.renewalToken) {
-            try {
-              const renewalUrl = `${appUrl}/renewal/${contract.renewalToken}`;
-              const html = buildTenantRenewalEmail({
-                tenantName,
-                propertyName,
-                endDate: endDateStr,
-                daysLeft,
-                renewalUrl,
-              });
-              await sendEmail(
-                contract.tenantEmail,
-                `Renovación de contrato - ${propertyName}`,
-                html,
-              );
-              emailsSent++;
-            } catch (e) {
-              console.error('Error enviando email inquilino 30d:', e);
-            }
-          }
-        }
-      }
-
-      // ═══════════════════════════════════════════
       // ALERTA 7 DÍAS - ADMIN: Vencimiento de contrato
       // ═══════════════════════════════════════════
       if (daysLeft > 0 && daysLeft <= 7) {
@@ -183,57 +129,6 @@ export async function POST() {
         }
       }
 
-      // ═══════════════════════════════════════════
-      // ALERTA 7 DÍAS - INQUILINO: Recordatorio con botones
-      // ═══════════════════════════════════════════
-      if (daysLeft > 0 && daysLeft <= 7) {
-        const exists7Tenant = await prisma.alert.findFirst({
-          where: {
-            contractId: contract.id,
-            recipientType: 'tenant',
-            triggerDaysBefore: 7,
-            type: 'contract_expiry',
-            status: { not: 'dismissed' },
-          },
-        });
-
-        if (!exists7Tenant && !contract.renewalResponse) {
-          await prisma.alert.create({
-            data: {
-              type: 'contract_expiry',
-              recipientType: 'tenant',
-              triggerDaysBefore: 7,
-              title: `URGENTE: Renovación en ${daysLeft} días - ${propertyName}`,
-              message: `${tenantName}, su contrato en ${propertyName} vence en ${daysLeft} día(s). Por favor indique su decisión lo antes posible.`,
-              dueDate: new Date(contract.endDate.getTime() - 7 * 24 * 60 * 60 * 1000),
-              contractId: contract.id,
-            },
-          });
-          createdCount++;
-
-          // Enviar email al inquilino con botones (recordatorio)
-          if (contract.tenantEmail && contract.renewalToken) {
-            try {
-              const renewalUrl = `${appUrl}/renewal/${contract.renewalToken}`;
-              const html = buildTenantRenewalEmail({
-                tenantName,
-                propertyName,
-                endDate: endDateStr,
-                daysLeft,
-                renewalUrl,
-              });
-              await sendEmail(
-                contract.tenantEmail,
-                `URGENTE: Renovación de contrato - ${propertyName}`,
-                html,
-              );
-              emailsSent++;
-            } catch (e) {
-              console.error('Error enviando email inquilino 7d:', e);
-            }
-          }
-        }
-      }
     }
 
     return NextResponse.json({
