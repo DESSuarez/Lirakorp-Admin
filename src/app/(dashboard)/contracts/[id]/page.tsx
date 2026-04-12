@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import { formatCurrency, formatDate, formatShortDate, daysUntil, getStatusLabel, getStatusColor } from '@/lib/utils';
+import AutoDownload from './AutoDownload';
+import ContractFileUpload from '../../properties/[id]/contract-file-upload';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -35,15 +37,15 @@ export default async function ContractDetailPage({ params }: Props) {
     {
       label: 'Inicio del contrato',
       date: contract.startDate,
-      icon: '📋',
+      icon: 'start',
       past: new Date() >= contract.startDate,
     },
     ...(contract.reviewDate
       ? [
           {
-            label: 'Fecha de revisión',
+            label: 'Fecha de revision',
             date: contract.reviewDate,
-            icon: '🔍',
+            icon: 'review',
             past: new Date() >= contract.reviewDate,
           },
         ]
@@ -51,13 +53,16 @@ export default async function ContractDetailPage({ params }: Props) {
     {
       label: 'Fin del contrato',
       date: contract.endDate,
-      icon: '📅',
+      icon: 'end',
       past: new Date() >= contract.endDate,
     },
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return (
     <div className="space-y-6">
+      {/* Auto-descarga PDF+DOCX si es contrato nuevo */}
+      <AutoDownload contractId={contract.id} />
+
       {/* Encabezado */}
       <div className="flex items-center justify-between">
         <div>
@@ -86,10 +91,10 @@ export default async function ContractDetailPage({ params }: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Información del contrato */}
+        {/* Informacion del contrato */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Información del Contrato</h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Informacion del Contrato</h2>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Estado</dt>
@@ -119,19 +124,19 @@ export default async function ContractDetailPage({ params }: Props) {
                     <span
                       className={`ml-2 text-xs font-medium ${daysLeft < 15 ? 'text-red-600' : daysLeft < 30 ? 'text-yellow-600' : 'text-green-600'}`}
                     >
-                      ({daysLeft} días restantes)
+                      ({daysLeft} dias restantes)
                     </span>
                   )}
                 </dd>
               </div>
               {contract.reviewDate && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Fecha de Revisión</dt>
+                  <dt className="text-sm font-medium text-gray-500">Fecha de Revision</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     {formatDate(contract.reviewDate)}
                     {reviewDaysLeft !== null && reviewDaysLeft > 0 && (
                       <span className="ml-2 text-xs text-gray-500">
-                        ({reviewDaysLeft} días restantes)
+                        ({reviewDaysLeft} dias restantes)
                       </span>
                     )}
                   </dd>
@@ -142,7 +147,7 @@ export default async function ContractDetailPage({ params }: Props) {
                 <dd className="mt-1 text-sm text-gray-900">{contract.annualIncrement}%</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Depósito</dt>
+                <dt className="text-sm font-medium text-gray-500">Deposito</dt>
                 <dd className="mt-1 text-sm text-gray-900">
                   {formatCurrency(contract.depositAmount || 0)}
                 </dd>
@@ -158,7 +163,7 @@ export default async function ContractDetailPage({ params }: Props) {
             )}
           </div>
 
-          {/* Información de la propiedad */}
+          {/* Informacion de la propiedad */}
           <div className="rounded-lg bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Propiedad</h2>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -169,11 +174,11 @@ export default async function ContractDetailPage({ params }: Props) {
               <div>
                 <dt className="text-sm font-medium text-gray-500">Zona</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  {contract.property.zone?.name || '—'}
+                  {contract.property.zone?.name || '\u2014'}
                 </dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-sm font-medium text-gray-500">Dirección</dt>
+                <dt className="text-sm font-medium text-gray-500">Direccion</dt>
                 <dd className="mt-1 text-sm text-gray-900">{contract.property.address}</dd>
               </div>
               {contract.property.propertyType && (
@@ -185,7 +190,7 @@ export default async function ContractDetailPage({ params }: Props) {
             </dl>
           </div>
 
-          {/* Información del inquilino */}
+          {/* Informacion del inquilino */}
           <div className="rounded-lg bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Datos del Inquilino</h2>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -194,20 +199,22 @@ export default async function ContractDetailPage({ params }: Props) {
                 <dd className="mt-1 text-sm text-gray-900">{contract.tenantName}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Correo Electrónico</dt>
+                <dt className="text-sm font-medium text-gray-500">Correo Electronico</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  <a href={`mailto:${contract.tenantEmail}`} className="text-blue-600 hover:underline">
-                    {contract.tenantEmail}
-                  </a>
+                  {contract.tenantEmail ? (
+                    <a href={`mailto:${contract.tenantEmail}`} className="text-blue-600 hover:underline">
+                      {contract.tenantEmail}
+                    </a>
+                  ) : '\u2014'}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Teléfono</dt>
-                <dd className="mt-1 text-sm text-gray-900">{contract.tenantPhone || '—'}</dd>
+                <dt className="text-sm font-medium text-gray-500">Telefono</dt>
+                <dd className="mt-1 text-sm text-gray-900">{contract.tenantPhone || '\u2014'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">WhatsApp</dt>
-                <dd className="mt-1 text-sm text-gray-900">{contract.tenantWhatsapp || '—'}</dd>
+                <dd className="mt-1 text-sm text-gray-900">{contract.tenantWhatsapp || '\u2014'}</dd>
               </div>
             </dl>
           </div>
@@ -215,34 +222,53 @@ export default async function ContractDetailPage({ params }: Props) {
 
         {/* Barra lateral */}
         <div className="space-y-6">
+          {/* Contrato firmado / Upload */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Contrato Firmado</h2>
+            {contract.status === 'pending_renewal' && !contract.contractFileUrl && (
+              <div className="mb-3 rounded-md bg-yellow-50 border border-yellow-200 p-3">
+                <p className="text-xs text-yellow-800 font-medium">Sube el contrato firmado para activar este contrato.</p>
+              </div>
+            )}
+            <ContractFileUpload
+              contractId={contract.id}
+              existingFileUrl={contract.contractFileUrl}
+              existingFileName={contract.contractFileName}
+            />
+          </div>
+
           {/* Acciones */}
           <div className="rounded-lg bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Acciones</h2>
             <div className="space-y-3">
+              {(contract.status === 'active' || contract.status === 'pending_renewal') && (
+                <Link
+                  href={`/contracts/new?renewFrom=${contract.id}`}
+                  className="flex w-full items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                >
+                  Renovar Contrato
+                </Link>
+              )}
               <a
                 href={`/api/contracts/${contract.id}/generate-pdf`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex w-full items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                className="flex w-full items-center justify-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
               >
-                Generar PDF
+                Descargar PDF
               </a>
               <a
                 href={`/api/contracts/${contract.id}/generate-docx`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex w-full items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="flex w-full items-center justify-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
               >
-                Generar Word
+                Descargar Word
               </a>
-              <RenewButton contractId={contract.id} status={contract.status} />
-              <SendRenewalButton contractId={contract.id} />
             </div>
           </div>
 
-          {/* Línea de tiempo */}
+          {/* Linea de tiempo */}
           <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Línea de Tiempo</h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Linea de Tiempo</h2>
             <div className="relative">
               <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200" />
               <ul className="space-y-6">
@@ -253,7 +279,7 @@ export default async function ContractDetailPage({ params }: Props) {
                         event.past ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                       }`}
                     >
-                      {event.past ? '✓' : '○'}
+                      {event.past ? '\u2713' : '\u25CB'}
                     </span>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{event.label}</p>
@@ -267,31 +293,5 @@ export default async function ContractDetailPage({ params }: Props) {
         </div>
       </div>
     </div>
-  );
-}
-
-function RenewButton({ contractId, status }: { contractId: string; status: string }) {
-  if (status !== 'active' && status !== 'pending_renewal') return null;
-
-  return (
-    <Link
-      href={`/contracts/new?renewFrom=${contractId}`}
-      className="flex w-full items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-    >
-      Renovar Contrato
-    </Link>
-  );
-}
-
-function SendRenewalButton({ contractId }: { contractId: string }) {
-  return (
-    <form action={`/api/contracts/${contractId}/send-renewal`} method="POST">
-      <button
-        type="submit"
-        className="flex w-full items-center justify-center rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-      >
-        Enviar Aviso de Renovación
-      </button>
-    </form>
   );
 }

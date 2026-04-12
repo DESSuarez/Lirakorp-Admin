@@ -134,7 +134,7 @@ export default function NewContractPage() {
       }
 
       const contract = await res.json();
-      router.push(`/contracts/${contract.id}`);
+      router.push(`/contracts/${contract.id}?new=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {

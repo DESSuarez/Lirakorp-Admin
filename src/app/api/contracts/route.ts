@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           signingTime: signingTime || null,
           propertyUse: propertyUse || 'CASA HABITACION',
           notes: notes || null,
-          status: 'active',
+          status: 'pending_renewal',
           renewalToken: crypto.randomBytes(32).toString('hex'),
         },
         include: {

@@ -68,6 +68,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     data: {
       contractFileUrl: fileUrl,
       contractFileName: file.name,
+      status: 'active',
     },
   })
 
