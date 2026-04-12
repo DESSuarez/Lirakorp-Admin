@@ -35,7 +35,7 @@ export default function NewContractPage() {
     monthlyRent: '',
     annualIncrement: '5',
     depositAmount: '',
-    fiadorName: '',
+    fiadorName: 'Celso Suárez Gurrola',
     fiadorProperty: '',
     propertyInventory: '',
     maintenanceFee: '',
@@ -56,42 +56,69 @@ export default function NewContractPage() {
   useEffect(() => {
     async function loadData() {
       try {
+        // Cargar todas las propiedades (available + la del contrato a renovar)
         const propsRes = await fetch('/api/properties?status=available');
+        let allProps: Property[] = [];
         if (propsRes.ok) {
-          const data = await propsRes.json();
-          setProperties(data);
+          allProps = await propsRes.json();
         }
 
         if (renewFrom) {
           const contractRes = await fetch(`/api/contracts/${renewFrom}`);
           if (contractRes.ok) {
             const contract = await contractRes.json();
+
+            // Agregar la propiedad del contrato si no está en la lista
+            if (contract.property && !allProps.find((p: Property) => p.id === contract.propertyId)) {
+              allProps.unshift({
+                id: contract.property.id,
+                name: contract.property.name,
+                address: contract.property.address || '',
+                zone: contract.property.zone,
+              });
+            }
+
             const oldEnd = new Date(contract.endDate);
             const newStart = new Date(oldEnd);
             newStart.setDate(newStart.getDate() + 1);
             const newEnd = new Date(newStart);
             newEnd.setFullYear(newEnd.getFullYear() + 1);
 
+            // Cargar inventario/descripción desde la propiedad
+            let propertyInventory = contract.propertyInventory || '';
+            if (!propertyInventory && contract.property?.description) {
+              propertyInventory = contract.property.description;
+            }
+
             setForm((prev) => ({
               ...prev,
               propertyId: contract.propertyId,
               tenantName: contract.tenantName,
-              tenantEmail: contract.tenantEmail,
+              tenantEmail: contract.tenantEmail || '',
               tenantPhone: contract.tenantPhone || '',
               tenantWhatsapp: contract.tenantWhatsapp || '',
               startDate: newStart.toISOString().split('T')[0],
               endDate: newEnd.toISOString().split('T')[0],
               monthlyRent: String(
                 Math.round(
-                  contract.monthlyRent * (1 + contract.annualIncrement / 100)
+                  contract.monthlyRent * (1 + (contract.annualIncrement || 0) / 100)
                 )
               ),
-              annualIncrement: String(contract.annualIncrement),
-              depositAmount: String(contract.depositAmount),
+              annualIncrement: String(contract.annualIncrement || 0),
+              depositAmount: String(contract.depositAmount || ''),
+              fiadorName: contract.fiadorName || 'Celso Suárez Gurrola',
+              fiadorProperty: contract.fiadorProperty || '',
+              propertyInventory,
+              maintenanceFee: contract.maintenanceFee ? String(contract.maintenanceFee) : '',
+              propertyUse: contract.propertyUse || 'CASA HABITACION',
+              signingCity: contract.signingCity || '',
+              signingTime: contract.signingTime || '10:00',
               notes: `Renovación del contrato anterior (ID: ${renewFrom})`,
             }));
           }
         }
+
+        setProperties(allProps);
       } catch {
         setError('Error al cargar los datos');
       } finally {

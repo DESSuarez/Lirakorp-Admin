@@ -306,17 +306,19 @@ export default function EditPropertyPage() {
           />
         </div>
 
-        {/* Description */}
+        {/* Description / Property Inventory */}
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-            Descripci&oacute;n
+            Inventario / Caracter&iacute;sticas del Inmueble
           </label>
+          <p className="text-xs text-gray-400 mb-1">Esta descripcion se usa automaticamente en los contratos generados (PDF/Word).</p>
           <textarea
             id="description"
             name="description"
             rows={4}
             value={form.description}
             onChange={handleChange}
+            placeholder="Ej: SALA-COMEDOR, COCINA INTEGRAL, 2 RECAMARAS CON CLOSET, PATIO DE SERVICIO, 2 BANOS COMPLETOS, ESTACIONAMIENTO..."
             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
           />
         </div>
