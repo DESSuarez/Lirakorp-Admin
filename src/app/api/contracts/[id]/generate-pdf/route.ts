@@ -145,11 +145,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
-  // Find template: first by zone, then general
+  // Find template: by zone + hasGuarantor, then zone only, then general
+  const hasGuarantor = contract.hasGuarantor ?? true
   let template = await prisma.contractTemplate.findFirst({
-    where: { zoneId: contract.property.zoneId, isActive: true },
+    where: { zoneId: contract.property.zoneId, hasGuarantor, isActive: true },
     orderBy: { year: 'desc' },
   })
+  if (!template) {
+    template = await prisma.contractTemplate.findFirst({
+      where: { zoneId: contract.property.zoneId, isActive: true },
+      orderBy: { year: 'desc' },
+    })
+  }
   if (!template) {
     template = await prisma.contractTemplate.findFirst({
       where: { zoneId: null, isActive: true },

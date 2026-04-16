@@ -25,6 +25,7 @@ export default function NewContractPage() {
   const [form, setForm] = useState({
     propertyId: '',
     contractType: 'arrendamiento',
+    hasGuarantor: true,
     tenantName: '',
     tenantEmail: '',
     tenantPhone: '',
@@ -417,39 +418,63 @@ export default function NewContractPage() {
           </div>
         </fieldset>
 
-        {/* Fiador */}
+        {/* Aval / Fiador */}
         <fieldset className="space-y-4">
-          <legend className="text-base font-semibold text-gray-900">Datos del Fiador</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="fiadorName" className="block text-sm font-medium text-gray-700">
-                Nombre completo del Fiador
-              </label>
+          <legend className="text-base font-semibold text-gray-900">Aval / Fiador</legend>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="text"
-                id="fiadorName"
-                name="fiadorName"
-                value={form.fiadorName}
-                onChange={handleChange}
-                placeholder="Ej: Juan Pérez López"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                type="radio"
+                name="hasGuarantor"
+                checked={form.hasGuarantor === true}
+                onChange={() => setForm((prev) => ({ ...prev, hasGuarantor: true }))}
+                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
               />
-            </div>
-            <div>
-              <label htmlFor="fiadorProperty" className="block text-sm font-medium text-gray-700">
-                Propiedad del Fiador (garantía)
-              </label>
-              <textarea
-                id="fiadorProperty"
-                name="fiadorProperty"
-                rows={2}
-                value={form.fiadorProperty}
-                onChange={handleChange}
-                placeholder="Ej: Terreno en Valle de Banderas, 575 m2, escritura #1234..."
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              <span className="text-sm font-medium text-gray-700">Con Aval</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="hasGuarantor"
+                checked={form.hasGuarantor === false}
+                onChange={() => setForm((prev) => ({ ...prev, hasGuarantor: false, fiadorName: '', fiadorProperty: '' }))}
+                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
               />
-            </div>
+              <span className="text-sm font-medium text-gray-700">Sin Aval</span>
+            </label>
           </div>
+          {form.hasGuarantor && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="fiadorName" className="block text-sm font-medium text-gray-700">
+                  Nombre completo del Fiador
+                </label>
+                <input
+                  type="text"
+                  id="fiadorName"
+                  name="fiadorName"
+                  value={form.fiadorName}
+                  onChange={handleChange}
+                  placeholder="Ej: Juan Pérez López"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="fiadorProperty" className="block text-sm font-medium text-gray-700">
+                  Propiedad del Fiador (garantia)
+                </label>
+                <textarea
+                  id="fiadorProperty"
+                  name="fiadorProperty"
+                  rows={2}
+                  value={form.fiadorProperty}
+                  onChange={handleChange}
+                  placeholder="Ej: Terreno en Valle de Banderas, 575 m2, escritura #1234..."
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                />
+              </div>
+            </div>
+          )}
         </fieldset>
 
         {/* Datos del inmueble para contrato */}

@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const {
       propertyId,
       contractType,
+      hasGuarantor,
       tenantName,
       tenantEmail,
       tenantPhone,
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
           signingTime: signingTime || null,
           propertyUse: propertyUse || 'CASA HABITACION',
           notes: notes || null,
+          hasGuarantor: hasGuarantor !== undefined ? hasGuarantor : true,
           status: 'pending_renewal',
           renewalToken: crypto.randomBytes(32).toString('hex'),
         },

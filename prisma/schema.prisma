@@ -63,6 +63,7 @@ model Contract {
   depositAmount     Float?
   contractType      String    @default("arrendamiento") // arrendamiento, comodato, temporal, comercial
   status            String    @default("active") // "active", "expired", "pending_renewal", "cancelled"
+  hasGuarantor      Boolean   @default(true) // true = con aval/fiador, false = sin aval
   // Datos del fiador
   fiadorName        String?   // Nombre completo del fiador
   fiadorProperty    String?   // Descripcion de la propiedad del fiador (escritura, ubicacion, medidas)
@@ -112,13 +113,14 @@ model Alert {
 }
 
 model ContractTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  content     String   // template content with placeholders
-  year        Int
-  zoneId      String?  // si es null, aplica como plantilla general
-  zone        Zone?    @relation(fields: [zoneId], references: [id])
-  contractType String  @default("arrendamiento") // arrendamiento, comodato, temporal, comercial, etc.
+  id            String   @id @default(cuid())
+  name          String
+  content       String   // template content with placeholders {{VARIABLE}}
+  year          Int
+  zoneId        String?  // si es null, aplica como plantilla general
+  zone          Zone?    @relation(fields: [zoneId], references: [id])
+  contractType  String   @default("arrendamiento") // arrendamiento, comodato, temporal, comercial, etc.
+  hasGuarantor  Boolean  @default(true) // true = plantilla con aval, false = sin aval
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

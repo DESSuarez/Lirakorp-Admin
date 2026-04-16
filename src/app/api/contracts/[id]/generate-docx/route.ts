@@ -36,8 +36,20 @@ function numberToWords(n: number): string {
   }
 }
 
-// Create a PENDIENTE text run with yellow highlight
-function pendiente(label: string): TextRun {
+function formatDateLong(d: Date): string {
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+  return `${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`
+}
+
+function formatDateLetras(d: Date): string {
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+  const yearWords = numberToWords(d.getFullYear()).toLowerCase()
+  return `${d.getDate()} de ${months[d.getMonth()]} del año ${d.getFullYear()} ${yearWords}`
+}
+
+const pend = (label: string) => `[PENDIENTE: ${label}]`
+
+function pendienteRun(label: string): TextRun {
   return new TextRun({
     text: `[PENDIENTE: ${label}]`,
     bold: true,
@@ -50,6 +62,101 @@ function pendiente(label: string): TextRun {
 
 function normalRun(text: string, bold = false, size = 22): TextRun {
   return new TextRun({ text, bold, font: 'Arial', size })
+}
+
+function applyPlaceholders(content: string, contract: any): string {
+  const months = differenceInMonths(contract.endDate, contract.startDate)
+  const propNumber = contract.property?.number || ''
+  const propName = contract.property?.name || ''
+  const propAddress = contract.property?.address || ''
+  const propM2 = contract.property?.squareMeters || ''
+  const inventory = contract.propertyInventory || contract.property?.description || pend('INVENTARIO DEL INMUEBLE')
+
+  const replacements: Record<string, string> = {
+    '{{ARRENDATARIO_NOMBRE}}': contract.tenantName || pend('NOMBRE DEL ARRENDATARIO'),
+    '{{FIADOR_NOMBRE}}': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
+    '{{FIADOR_PROPIEDAD}}': contract.fiadorProperty || pend('PROPIEDAD DEL FIADOR'),
+    '{{FECHA_INICIO}}': formatDateLong(contract.startDate),
+    '{{FECHA_INICIO_LETRAS}}': formatDateLetras(contract.startDate),
+    '{{FECHA_FIN}}': formatDateLong(contract.endDate),
+    '{{FECHA_FIN_LETRAS}}': formatDateLetras(contract.endDate),
+    '{{RENTA_MENSUAL}}': formatCurrency(contract.monthlyRent),
+    '{{RENTA_LETRAS}}': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '{{DEPOSITO}}': contract.depositAmount ? formatCurrency(contract.depositAmount) : pend('DEPOSITO'),
+    '{{DEPOSITO_LETRAS}}': contract.depositAmount ? `${numberToWords(contract.depositAmount)} PESOS 00/100 M.N` : pend('DEPOSITO EN LETRA'),
+    '{{PROPIEDAD_NUMERO}}': propNumber,
+    '{{PROPIEDAD_NOMBRE}}': propName,
+    '{{PROPIEDAD_DIRECCION}}': propAddress || pend('DIRECCION DEL INMUEBLE'),
+    '{{PROPIEDAD_M2}}': String(propM2),
+    '{{PROPIEDAD_INVENTARIO}}': inventory,
+    '{{PROPIEDAD_USO}}': contract.propertyUse || 'CASA HABITACION',
+    '{{MANTENIMIENTO}}': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : pend('CUOTA MANTENIMIENTO'),
+    '{{MANTENIMIENTO_LETRAS}}': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : pend('CUOTA MANTENIMIENTO EN LETRA'),
+    '{{DURACION}}': `${months} MESES`,
+    '{{DURACION_LETRAS}}': months === 12 ? 'UN AÑO' : `${numberToWords(months)} MESES`,
+    '{{CIUDAD_FIRMA}}': contract.signingCity || pend('CIUDAD DE FIRMA'),
+    '{{HORA_FIRMA}}': contract.signingTime || '10:00',
+    '{{ARRENDADOR_NOMBRE}}': 'CELSO SUAREZ GURROLA',
+    '{{FECHA_FIRMA}}': formatDateLong(new Date()),
+  }
+
+  // Also support old hardcoded replacements for backward compatibility with existing templates
+  const legacyReplacements: Record<string, string> = {
+    'LUIS MIGUEL ARIZA JIMENEZ': contract.tenantName,
+    'MICA IMELY': contract.tenantName,
+    'ALFONSO GALINDO FRANCO': contract.tenantName,
+    'JUAN ENRIQUE VENEGAS DIAZ': contract.tenantName,
+    'ALICIA DIAZ NAVEZ': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
+    'LUIS FACUNDO IMELY': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
+    'ARACELI HERNANDEZ NUÑO': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
+    // Las Juntas dates
+    '15 de Diciembre del año 2025 dos mil veinticinco': formatDateLetras(contract.startDate),
+    '15 de Diciembre  de  2025': formatDateLong(contract.startDate),
+    '15 de Diciembre de  2025': formatDateLong(contract.startDate),
+    '14 de Diciembre 2026': formatDateLong(contract.endDate),
+    '14 DE Diciembre  de  2026': formatDateLong(contract.endDate),
+    '14 de Diciembre  de 2026': formatDateLong(contract.endDate),
+    // Ciudad Granja dates
+    '11 de Diciembre de 2025 dos mil veinticinco': formatDateLetras(contract.startDate),
+    '10 de Diciembre de 2026': formatDateLong(contract.endDate),
+    // Wolf Tower dates
+    '14 de Octubre de 2025 dos mil veinticinco': formatDateLetras(contract.startDate),
+    '14 de Noviembre de 2025 dos mil veinticinco': formatDateLetras(contract.startDate),
+    '14  de Octubre del 2026': formatDateLong(contract.endDate),
+    '14  de Noviembre del 2026': formatDateLong(contract.endDate),
+    // Rent
+    '$7,900.00': formatCurrency(contract.monthlyRent),
+    'SIETE MIL NOVECIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '$19,500.00': formatCurrency(contract.monthlyRent),
+    'DIECINUEVE MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '$ 22,500.00': formatCurrency(contract.monthlyRent),
+    'VEINTIDOS MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    '$ 23,500.00': formatCurrency(contract.monthlyRent),
+    'VEINTITRES MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
+    // Maintenance
+    '$ 300.00': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : pend('CUOTA MANTENIMIENTO'),
+    'Trecientos pesos 00/100 M.N': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : pend('CUOTA MANTENIMIENTO EN LETRA'),
+    // Property
+    'DEPARTAMENTO # 08': `DEPARTAMENTO # ${propNumber}`,
+    'DEPARTAMENTO No. 08': `DEPARTAMENTO No. ${propNumber}`,
+    'DEPARTAMENTO NUMERO 202': `DEPARTAMENTO NUMERO ${propNumber}`,
+    'DEPARTAMENTO NUMERO 302': `DEPARTAMENTO NUMERO ${propNumber}`,
+    'CASA No, 1 (UNO)': `CASA No. ${propNumber}`,
+    // Duration
+    '( UN AÑO)': `(${months === 12 ? 'UN AÑO' : numberToWords(months) + ' MESES'})`,
+    '(UN AÑO)': `(${months === 12 ? 'UN AÑO' : numberToWords(months) + ' MESES'})`,
+  }
+
+  let result = content
+  // Apply new placeholders first
+  for (const [search, replace] of Object.entries(replacements)) {
+    result = result.split(search).join(replace)
+  }
+  // Then legacy replacements
+  for (const [search, replace] of Object.entries(legacyReplacements)) {
+    result = result.split(search).join(replace)
+  }
+  return result
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -65,11 +172,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
-  // Find template by zone first, then general
+  // Find template by zone + hasGuarantor, then zone only, then general
+  const hasGuarantor = contract.hasGuarantor ?? true
   let template = await prisma.contractTemplate.findFirst({
-    where: { zoneId: contract.property.zoneId, isActive: true },
+    where: { zoneId: contract.property.zoneId, hasGuarantor, isActive: true },
     orderBy: { year: 'desc' },
   })
+  if (!template) {
+    template = await prisma.contractTemplate.findFirst({
+      where: { zoneId: contract.property.zoneId, isActive: true },
+      orderBy: { year: 'desc' },
+    })
+  }
   if (!template) {
     template = await prisma.contractTemplate.findFirst({
       where: { zoneId: null, isActive: true },
@@ -81,52 +195,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'No se encontro plantilla para esta zona. Suba una plantilla en la seccion de Plantillas.' }, { status: 404 })
   }
 
-  const months = differenceInMonths(contract.endDate, contract.startDate)
-
-  // Build replacement map
-  // All values are filled - missing data gets [PENDIENTE: label] as the replacement text
-  const pend = (label: string) => `[PENDIENTE: ${label}]`
-
-  const replacements: Record<string, string> = {
-    // Tenant names (from both templates)
-    'LUIS MIGUEL ARIZA JIMENEZ': contract.tenantName,
-    'MICA IMELY': contract.tenantName,
-    // Fiador names - replace with actual or PENDIENTE
-    'ALICIA DIAZ NAVEZ': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
-    'LUIS FACUNDO IMELY': contract.fiadorName || pend('NOMBRE DEL FIADOR'),
-    // Dates - Las Juntas template
-    '15 de Diciembre del año 2025 dos mil veinticinco': formatDate(contract.startDate),
-    '15 de Diciembre  de  2025': formatDate(contract.startDate),
-    '15 de Diciembre de  2025': formatDate(contract.startDate),
-    '14 de Diciembre 2026': formatDate(contract.endDate),
-    '14 DE Diciembre  de  2026': formatDate(contract.endDate),
-    '14 de Diciembre  de 2026': formatDate(contract.endDate),
-    // Dates - Ciudad Granja template
-    '11 de Diciembre de 2025 dos mil veinticinco': formatDate(contract.startDate),
-    '10 de Diciembre de 2026': formatDate(contract.endDate),
-    // Rent amounts
-    '$7,900.00': formatCurrency(contract.monthlyRent),
-    'SIETE MIL NOVECIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
-    '$19,500.00': formatCurrency(contract.monthlyRent),
-    'DIECINUEVE MIL QUINIENTOS PESOS 00/100 M.N': `${numberToWords(contract.monthlyRent)} PESOS 00/100 M.N`,
-    // Maintenance
-    '$ 300.00': contract.maintenanceFee ? formatCurrency(contract.maintenanceFee) : pend('CUOTA MANTENIMIENTO'),
-    'Trecientos pesos 00/100 M.N': contract.maintenanceFee ? `${numberToWords(contract.maintenanceFee)} PESOS 00/100 M.N` : pend('CUOTA MANTENIMIENTO EN LETRA'),
-    // Department/property number
-    'DEPARTAMENTO # 08': `DEPARTAMENTO # ${contract.property.number}`,
-    'DEPARTAMENTO No. 08': `DEPARTAMENTO No. ${contract.property.number}`,
-    'CASA No, 1 (UNO)': `CASA No. ${contract.property.number}`,
-    // Duration
-    '( UN AÑO)': `(${months} MESES)`,
-    'UN AÑO': `${months} MESES`,
-  }
-
-  // Process template: replace all values (missing ones already have PENDIENTE text)
-  let content = template.content
-
-  for (const [search, replace] of Object.entries(replacements)) {
-    content = content.split(search).join(replace)
-  }
+  // Apply placeholder substitutions
+  const content = applyPlaceholders(template.content, contract)
 
   // Build Word document paragraphs
   const lines = content.split('\n')
@@ -145,28 +215,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const isClauseStart = /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA|SEXTA|S[EÉ]PTIMA|OCTAVA|NOVENA|D[EÉ]CIMA|VIG[EÉ]SI)/.test(trimmed)
     const isSectionHeader = /^[IVX]+[\.\s]/.test(trimmed)
 
-    // Build text runs - detect [PENDIENTE: ...] markers for yellow highlight
     const children: TextRun[] = []
-    let processedText = trimmed
-    if (processedText.includes('[PENDIENTE:')) {
+    if (trimmed.includes('[PENDIENTE:')) {
       const regex = /\[PENDIENTE: ([^\]]+)\]/g
       let lastIndex = 0
       let match
-      while ((match = regex.exec(processedText)) !== null) {
-        // Text before PENDIENTE
+      while ((match = regex.exec(trimmed)) !== null) {
         if (match.index > lastIndex) {
-          children.push(normalRun(processedText.substring(lastIndex, match.index), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
+          children.push(normalRun(trimmed.substring(lastIndex, match.index), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
         }
-        // PENDIENTE marker
-        children.push(pendiente(match[1]))
+        children.push(pendienteRun(match[1]))
         lastIndex = match.index + match[0].length
       }
-      // Text after last PENDIENTE
-      if (lastIndex < processedText.length) {
-        children.push(normalRun(processedText.substring(lastIndex), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
+      if (lastIndex < trimmed.length) {
+        children.push(normalRun(trimmed.substring(lastIndex), isClauseStart || isMainTitle || isDeclaraciones || isClausulas))
       }
     } else {
-      children.push(normalRun(processedText, isClauseStart || isMainTitle || isDeclaraciones || isClausulas || isSectionHeader, isMainTitle ? 28 : 22))
+      children.push(normalRun(trimmed, isClauseStart || isMainTitle || isDeclaraciones || isClausulas || isSectionHeader, isMainTitle ? 28 : 22))
     }
 
     paragraphs.push(new Paragraph({
@@ -186,62 +251,89 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }
 
-  paragraphs.push(new Paragraph({
-    children: [],
-  }))
+  const sigRows: TableRow[] = [
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [
+            new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('"LA SUBARRENDADORA"', true, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('ACK CIMENTACIONES S.A. DE C.V.', false, 18)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('CELSO SUAREZ GURROLA', false, 18)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('ADMINISTRADOR UNICO', false, 16)], alignment: AlignmentType.CENTER }),
+          ],
+          borders: noBorders,
+          width: { size: 50, type: WidthType.PERCENTAGE },
+        }),
+        new TableCell({
+          children: [
+            new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('"LA SUBARRENDATARIA"', true, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun(contract.tenantName, false, 18)], alignment: AlignmentType.CENTER }),
+          ],
+          borders: noBorders,
+          width: { size: 50, type: WidthType.PERCENTAGE },
+        }),
+      ],
+    }),
+  ]
 
-  // Signature table
+  if (hasGuarantor) {
+    // Con aval: firma del fiador
+    sigRows.push(new TableRow({
+      children: [
+        new TableCell({
+          children: [
+            new Paragraph({ spacing: { before: 300 } }),
+            new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [normalRun('"EL FIADOR"', true, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({
+              children: [contract.fiadorName ? normalRun(contract.fiadorName, false, 18) : pendienteRun('NOMBRE DEL FIADOR')],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+          borders: noBorders,
+          columnSpan: 2,
+        }),
+      ],
+    }))
+  } else {
+    // Sin aval: firma de testigos
+    sigRows.push(new TableRow({
+      children: [
+        new TableCell({
+          children: [
+            new Paragraph({ spacing: { before: 400 } }),
+            new Paragraph({ children: [normalRun('TESTIGO:', true, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ spacing: { before: 200 } }),
+            new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+          ],
+          borders: noBorders,
+          width: { size: 50, type: WidthType.PERCENTAGE },
+        }),
+        new TableCell({
+          children: [
+            new Paragraph({ spacing: { before: 400 } }),
+            new Paragraph({ children: [normalRun('TESTIGO:', true, 20)], alignment: AlignmentType.CENTER }),
+            new Paragraph({ spacing: { before: 200 } }),
+            new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
+          ],
+          borders: noBorders,
+          width: { size: 50, type: WidthType.PERCENTAGE },
+        }),
+      ],
+    }))
+  }
+
   const sigTable = new Table({
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            children: [
-              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({ children: [normalRun('LA SUBARRENDADORA', true, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({ children: [normalRun('ACK CIMENTACIONES S.A. DE C.V.', false, 18)], alignment: AlignmentType.CENTER }),
-            ],
-            borders: noBorders,
-            width: { size: 50, type: WidthType.PERCENTAGE },
-          }),
-          new TableCell({
-            children: [
-              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({ children: [normalRun('LA SUBARRENDATARIA', true, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({ children: [normalRun(contract.tenantName, false, 18)], alignment: AlignmentType.CENTER }),
-            ],
-            borders: noBorders,
-            width: { size: 50, type: WidthType.PERCENTAGE },
-          }),
-        ],
-      }),
-      new TableRow({
-        children: [
-          new TableCell({
-            children: [
-              new Paragraph({ spacing: { before: 300 } }),
-              new Paragraph({ children: [normalRun('_________________________', false, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({ children: [normalRun('EL FIADOR', true, 20)], alignment: AlignmentType.CENTER }),
-              new Paragraph({
-                children: [contract.fiadorName ? normalRun(contract.fiadorName, false, 18) : pendiente('NOMBRE DEL FIADOR')],
-                alignment: AlignmentType.CENTER,
-              }),
-            ],
-            borders: noBorders,
-            columnSpan: 2,
-          }),
-        ],
-      }),
-    ],
+    rows: sigRows,
     width: { size: 100, type: WidthType.PERCENTAGE },
   })
 
   const doc = new Document({
     sections: [{
       properties: {
-        page: {
-          margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
-        },
+        page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } },
       },
       children: [...paragraphs, sigTable],
     }],
