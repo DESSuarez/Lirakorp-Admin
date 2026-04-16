@@ -48,6 +48,7 @@ async function getDashboardData() {
       return sum + (activeContract?.monthlyRent || 0)
     }, 0)
     return {
+      id: zone.id,
       name: zone.name,
       total,
       rented,
@@ -134,7 +135,7 @@ export default async function DashboardPage() {
         <h2 className="text-lg font-semibold mb-4">Resumen por Zona</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.zoneStats.map((zone) => (
-            <div key={zone.name} className="border border-gray-200 rounded-lg p-4">
+            <Link key={zone.name} href={`/properties?zone=${zone.id}`} className="border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer block">
               <h3 className="font-semibold text-gray-900">{zone.name}</h3>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -164,7 +165,7 @@ export default async function DashboardPage() {
                   <span className="font-semibold text-green-600">{formatCurrency(zone.monthlyRent)}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
