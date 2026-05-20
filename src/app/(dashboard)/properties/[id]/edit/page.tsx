@@ -143,10 +143,20 @@ export default function EditPropertyPage() {
           <span>/</span>
           <span className="text-gray-900">Editar</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Editar Propiedad</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Modifica los datos de la propiedad.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Editar Propiedad</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Modifica los datos de la propiedad.
+            </p>
+          </div>
+          <Link
+            href={`/properties/${id}`}
+            className="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            Volver
+          </Link>
+        </div>
       </div>
 
       <form

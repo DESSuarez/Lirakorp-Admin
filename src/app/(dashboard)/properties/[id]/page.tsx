@@ -128,27 +128,22 @@ export default async function PropertyDetailPage({ params }: Props) {
               </div>
               {property.description && (
                 <div className="sm:col-span-2">
-                  <dt className="text-sm font-medium text-gray-500">Descripci&oacute;n</dt>
-                  <dd className="mt-1 text-sm text-red-600 font-bold whitespace-pre-wrap">
+                  <dt className="text-sm font-medium text-gray-500">Inventario / Caracter&iacute;sticas</dt>
+                  <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
                     {property.description}
+                  </dd>
+                </div>
+              )}
+              {property.adminNotes && (
+                <div className="sm:col-span-2">
+                  <dt className="text-sm font-medium text-amber-700">Notas del Administrador</dt>
+                  <dd className="mt-1 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md p-3 whitespace-pre-wrap">
+                    {property.adminNotes}
                   </dd>
                 </div>
               )}
             </dl>
           </div>
-
-          {/* Admin Notes */}
-          {property.adminNotes && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg shadow-sm p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center">
-                  <svg className="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                </div>
-                <h2 className="text-sm font-semibold text-amber-800">Notas del Administrador</h2>
-              </div>
-              <p className="text-sm text-amber-900 whitespace-pre-wrap">{property.adminNotes}</p>
-            </div>
-          )}
 
           {/* Photo Gallery */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
