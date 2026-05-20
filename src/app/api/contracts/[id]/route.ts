@@ -99,12 +99,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    // Si el estado cambia a expired, actualizar propiedad a available
+    // Si el estado cambia a expired, actualizar propiedad a available SOLO si no hay otro contrato activo
     if (status === 'expired' && existing.status !== 'expired') {
-      await prisma.property.update({
-        where: { id: existing.propertyId },
-        data: { status: 'available' },
+      const otherActive = await prisma.contract.findFirst({
+        where: {
+          propertyId: existing.propertyId,
+          status: 'active',
+          id: { not: existing.id },
+        },
       });
+      if (!otherActive) {
+        await prisma.property.update({
+          where: { id: existing.propertyId },
+          data: { status: 'available' },
+        });
+      }
     }
 
     return NextResponse.json(contract);
