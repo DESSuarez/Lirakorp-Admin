@@ -16,6 +16,7 @@ import PhotoUploadButton from './photo-upload-button';
 import ContractFileUpload from './contract-file-upload';
 import RenewContractForm from './RenewContractForm';
 import EditContractDates from './EditContractDates';
+import CreateContractForm from './CreateContractForm';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -210,22 +211,19 @@ export default async function PropertyDetailPage({ params }: Props) {
             )}
           </div>
 
-          {/* Renovar Contrato */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              {activeContract ? 'Renovar Contrato' : 'Crear Contrato'}
-            </h2>
-            {activeContract ? (
-              <RenewContractForm contractId={activeContract.id} propertyId={property.id} />
-            ) : (
-              <Link
-                href={`/contracts/new?propertyId=${property.id}`}
-                className="flex w-full items-center justify-center rounded-lg bg-[#2663EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4fc2] transition-colors"
-              >
-                Crear Contrato
-              </Link>
-            )}
-          </div>
+          {/* Renovar / Crear Contrato — solo si NO hay contrato activo vigente */}
+          {(!activeContract || contractStatus.level === 'expired') && (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                {activeContract ? 'Renovar Contrato' : 'Crear Contrato'}
+              </h2>
+              {activeContract ? (
+                <RenewContractForm contractId={activeContract.id} propertyId={property.id} />
+              ) : (
+                <CreateContractForm propertyId={property.id} />
+              )}
+            </div>
+          )}
 
           {/* Contrato Firmado (upload) */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">

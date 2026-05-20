@@ -65,6 +65,25 @@ export default async function PropertiesPage({
         </Link>
       </div>
 
+      {/* Zone Quick Filter */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <Link
+          href="/properties"
+          className={`px-3 py-2 rounded-lg text-sm font-medium text-center transition-all ${!zone ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-blue-50'}`}
+        >
+          Todas
+        </Link>
+        {zones.map((z) => (
+          <Link
+            key={z.id}
+            href={`/properties?zone=${z.id}`}
+            className={`px-3 py-2 rounded-lg text-sm font-medium text-center transition-all truncate ${zone === z.id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-blue-50'}`}
+          >
+            {z.name}
+          </Link>
+        ))}
+      </div>
+
       {/* Filters */}
       <form method="GET" className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <div>
