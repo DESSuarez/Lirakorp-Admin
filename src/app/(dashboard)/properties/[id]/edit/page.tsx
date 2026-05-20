@@ -11,7 +11,7 @@ interface Zone {
 }
 
 const PROPERTY_TYPES = ['LOCAL', 'OFICINA', 'BODEGA', 'TERRENO', 'DEPARTAMENTO', 'CASA'];
-const STATUSES = ['DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO', 'INACTIVO', 'CONVENIO CON PROPIETARIO'];
+const STATUSES = ['available', 'rented', 'maintenance', 'inactive'];
 
 export default function EditPropertyPage() {
   const router = useRouter();
@@ -294,7 +294,7 @@ export default function EditPropertyPage() {
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {s === 'available' ? 'Disponible' : s === 'rented' ? 'Rentado' : s === 'maintenance' ? 'Mantenimiento' : 'Inactivo'}
                 </option>
               ))}
             </select>

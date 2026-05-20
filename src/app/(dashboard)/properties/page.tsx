@@ -36,7 +36,12 @@ export default async function PropertiesPage({
     prisma.zone.findMany({ orderBy: { name: 'asc' } }),
   ]);
 
-  const statuses = ['DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO', 'INACTIVO'];
+  const statuses = [
+    { value: 'available', label: 'Disponible' },
+    { value: 'rented', label: 'Rentado' },
+    { value: 'maintenance', label: 'Mantenimiento' },
+    { value: 'inactive', label: 'Inactivo' },
+  ];
   const propertyTypes = ['LOCAL', 'OFICINA', 'BODEGA', 'TERRENO', 'DEPARTAMENTO', 'CASA'];
 
   return (
@@ -117,8 +122,8 @@ export default async function PropertiesPage({
           >
             <option value="">Todos los estados</option>
             {statuses.map((s) => (
-              <option key={s} value={s}>
-                {getStatusLabel(s)}
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
