@@ -48,8 +48,8 @@ export default async function PropertyDetailPage({ params }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <Link href="/properties" className="hover:text-blue-600 transition-colors">
-              Propiedades
+            <Link href={`/properties?zone=${property.zoneId}`} className="hover:text-blue-600 transition-colors">
+              {property.zone?.name || 'Propiedades'}
             </Link>
             <span>/</span>
             <span className="text-gray-900">{property.name}</span>
@@ -69,7 +69,7 @@ export default async function PropertyDetailPage({ params }: Props) {
             Editar
           </Link>
           <Link
-            href="/properties"
+            href={`/properties?zone=${property.zoneId}`}
             className="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
           >
             Volver
