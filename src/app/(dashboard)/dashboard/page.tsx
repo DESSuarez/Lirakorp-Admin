@@ -170,31 +170,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Alerts */}
-      {data.recentAlerts.length > 0 && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Alertas Pendientes</h2>
-            <Link href="/alerts" className="text-primary-600 text-sm hover:underline">
-              Ver todas
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {data.recentAlerts.map((alert) => (
-              <div key={alert.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                  daysUntil(alert.dueDate) <= 7 ? 'bg-red-500' : daysUntil(alert.dueDate) <= 30 ? 'bg-yellow-500' : 'bg-blue-500'
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{alert.title}</p>
-                  <p className="text-sm text-gray-500 truncate">{alert.message}</p>
-                </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">{formatShortDate(alert.dueDate)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
