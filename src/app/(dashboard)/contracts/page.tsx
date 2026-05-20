@@ -174,7 +174,7 @@ export default async function ContractsPage({
                 return (
                   <tr key={contract.id} className={`${urgencyClass} hover:bg-gray-50`}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                      <Link href={`/contracts/${contract.id}`} className="hover:text-blue-600">
+                      <Link href={`/properties/${contract.property.id}`} className="hover:text-blue-600">
                         {contract.property.name}
                       </Link>
                       <div className="text-xs text-gray-500">{contract.property.zone?.name}</div>
@@ -208,17 +208,10 @@ export default async function ContractsPage({
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm">
                       <Link
-                        href={`/contracts/${contract.id}`}
+                        href={`/properties/${contract.property.id}`}
                         className="text-blue-600 hover:text-blue-900"
                       >
-                        Ver
-                      </Link>
-                      <span className="mx-1 text-gray-300">|</span>
-                      <Link
-                        href={`/contracts/${contract.id}/edit`}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        Editar
+                        Ver propiedad
                       </Link>
                     </td>
                   </tr>

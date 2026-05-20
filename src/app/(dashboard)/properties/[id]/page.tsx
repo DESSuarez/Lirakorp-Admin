@@ -14,6 +14,7 @@ import {
 import PhotoGallery from './photo-gallery';
 import PhotoUploadButton from './photo-upload-button';
 import ContractFileUpload from './contract-file-upload';
+import RenewContractForm from './RenewContractForm';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -217,26 +218,21 @@ export default async function PropertyDetailPage({ params }: Props) {
             )}
           </div>
 
-          {/* Acciones */}
+          {/* Renovar Contrato */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Acciones</h2>
-            <div className="space-y-2">
-              {activeContract ? (
-                <Link
-                  href={`/contracts/new?renewFrom=${activeContract.id}`}
-                  className="flex w-full items-center justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
-                >
-                  Renovar Contrato
-                </Link>
-              ) : (
-                <Link
-                  href={`/contracts/new?propertyId=${property.id}`}
-                  className="flex w-full items-center justify-center rounded-lg bg-[#2663EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4fc2] transition-colors"
-                >
-                  Crear Contrato
-                </Link>
-              )}
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              {activeContract ? 'Renovar Contrato' : 'Crear Contrato'}
+            </h2>
+            {activeContract ? (
+              <RenewContractForm contractId={activeContract.id} propertyId={property.id} />
+            ) : (
+              <Link
+                href={`/contracts/new?propertyId=${property.id}`}
+                className="flex w-full items-center justify-center rounded-lg bg-[#2663EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4fc2] transition-colors"
+              >
+                Crear Contrato
+              </Link>
+            )}
           </div>
 
           {/* Historial de Contratos */}
@@ -267,15 +263,26 @@ export default async function PropertyDetailPage({ params }: Props) {
                     'Cancelado'
 
                   return (
-                    <li key={contract.id}>
-                      <Link href={`/contracts/${contract.id}`} className="block p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900 truncate">{contract.tenantName || 'Sin inquilino'}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStyle}`}>{stLabel}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">{formatShortDate(contract.startDate)} - {formatShortDate(contract.endDate)}</p>
-                        <p className="text-xs font-medium text-gray-700 mt-0.5">{formatCurrency(contract.monthlyRent)}/mes</p>
-                      </Link>
+                    <li key={contract.id} className="p-2 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900 truncate">{contract.tenantName || 'Sin inquilino'}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStyle}`}>{stLabel}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{formatShortDate(contract.startDate)} - {formatShortDate(contract.endDate)}</p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <p className="text-xs font-medium text-gray-700">{formatCurrency(contract.monthlyRent)}/mes</p>
+                        {contract.contractFileUrl && (
+                          <a
+                            href={contract.contractFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Ver contrato
+                          </a>
+                        )}
+                      </div>
                     </li>
                   )
                 })}
