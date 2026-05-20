@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 export default function RenewContractForm({ contractId, propertyId }: { contractId: string; propertyId: string }) {
   const router = useRouter()
+  const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -12,7 +13,7 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!endDate) return
+    if (!startDate || !endDate) return
     setLoading(true)
     setError('')
 
@@ -21,11 +22,6 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
       const res = await fetch(`/api/contracts/${contractId}`)
       if (!res.ok) throw new Error('No se pudo obtener el contrato actual')
       const current = await res.json()
-
-      // New start = old end + 1 day
-      const oldEnd = new Date(current.endDate)
-      const newStart = new Date(oldEnd)
-      newStart.setDate(newStart.getDate() + 1)
 
       // Calculate new rent with increment
       const increment = current.annualIncrement || 0
@@ -43,8 +39,8 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
           tenantEmail: current.tenantEmail || '',
           tenantPhone: current.tenantPhone || '',
           tenantWhatsapp: current.tenantWhatsapp || '',
-          startDate: newStart.toISOString().split('T')[0],
-          endDate: endDate,
+          startDate,
+          endDate,
           monthlyRent: newRent,
           annualIncrement: increment,
           depositAmount: current.depositAmount || 0,
@@ -55,7 +51,7 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
           propertyUse: current.propertyUse || 'CASA HABITACION',
           signingCity: current.signingCity || '',
           signingTime: current.signingTime || '10:00',
-          notes: `Renovacion del contrato anterior`,
+          notes: 'Renovacion del contrato anterior',
         }),
       })
 
@@ -92,10 +88,23 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-sm text-gray-600">Ingresa la nueva fecha de vencimiento. Los datos del inquilino y renta se copian del contrato actual.</p>
+      <p className="text-sm text-gray-600">Ingresa las fechas del nuevo contrato. Los datos del inquilino y renta se copian automaticamente.</p>
+      <div>
+        <label htmlFor="renewStartDate" className="block text-sm font-medium text-gray-700 mb-1">
+          Fecha de inicio
+        </label>
+        <input
+          type="date"
+          id="renewStartDate"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          required
+          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm"
+        />
+      </div>
       <div>
         <label htmlFor="renewEndDate" className="block text-sm font-medium text-gray-700 mb-1">
-          Nueva fecha de fin
+          Fecha de vencimiento
         </label>
         <input
           type="date"
@@ -109,7 +118,7 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
       {error && <p className="text-xs text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={loading || !endDate}
+        disabled={loading || !startDate || !endDate}
         className="flex w-full items-center justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
       >
         {loading ? 'Renovando...' : 'Renovar Contrato'}

@@ -204,20 +204,6 @@ export default async function PropertyDetailPage({ params }: Props) {
             )}
           </div>
 
-          {/* Contrato Firmado (upload) */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Contrato Firmado</h2>
-            {activeContract ? (
-              <ContractFileUpload
-                contractId={activeContract.id}
-                existingFileUrl={activeContract.contractFileUrl}
-                existingFileName={activeContract.contractFileName}
-              />
-            ) : (
-              <p className="text-sm text-gray-500">Crea un contrato primero.</p>
-            )}
-          </div>
-
           {/* Renovar Contrato */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">
@@ -232,6 +218,20 @@ export default async function PropertyDetailPage({ params }: Props) {
               >
                 Crear Contrato
               </Link>
+            )}
+          </div>
+
+          {/* Contrato Firmado (upload) */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Contrato Firmado</h2>
+            {activeContract ? (
+              <ContractFileUpload
+                contractId={activeContract.id}
+                existingFileUrl={activeContract.contractFileUrl}
+                existingFileName={activeContract.contractFileName}
+              />
+            ) : (
+              <p className="text-sm text-gray-500">Renueva o crea un contrato primero.</p>
             )}
           </div>
 
