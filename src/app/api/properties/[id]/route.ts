@@ -72,6 +72,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       zoneId,
       address,
       description,
+      adminNotes,
       monthlyRent,
       status,
     } = body;
@@ -100,6 +101,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         ...(zoneId !== undefined && { zoneId }),
         ...(address !== undefined && { address: address || null }),
         ...(description !== undefined && { description: description || null }),
+        ...(adminNotes !== undefined && { adminNotes: adminNotes || null }),
         ...(monthlyRent !== undefined && {
           monthlyRent: parseFloat(monthlyRent),
         }),
