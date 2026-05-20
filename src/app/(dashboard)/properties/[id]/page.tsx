@@ -15,6 +15,7 @@ import PhotoGallery from './photo-gallery';
 import PhotoUploadButton from './photo-upload-button';
 import ContractFileUpload from './contract-file-upload';
 import RenewContractForm from './RenewContractForm';
+import EditContractDates from './EditContractDates';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -198,6 +199,11 @@ export default async function PropertyDetailPage({ params }: Props) {
                   <span className="text-gray-500">Renta</span>
                   <span className="font-semibold text-gray-900">{formatCurrency(activeContract.monthlyRent)}/mes</span>
                 </div>
+                <EditContractDates
+                  contractId={activeContract.id}
+                  currentStart={activeContract.startDate.toISOString().split('T')[0]}
+                  currentEnd={activeContract.endDate.toISOString().split('T')[0]}
+                />
               </div>
             ) : (
               <p className="mt-3 text-sm text-gray-500">No hay contrato activo.</p>
