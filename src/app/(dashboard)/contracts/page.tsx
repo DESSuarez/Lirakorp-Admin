@@ -4,7 +4,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { formatCurrency, formatDate, formatShortDate, daysUntil, getStatusLabel, getStatusColor } from '@/lib/utils';
-import RenewContractDropdown from './RenewContractDropdown';
 
 interface SearchParams {
   status?: string;
@@ -62,15 +61,7 @@ export default async function ContractsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Contratos</h1>
-        <div className="flex gap-3">
-          <Link
-            href="/contracts/new"
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-          >
-            + Crear Contrato
-          </Link>
-          <RenewContractDropdown contracts={contracts.filter(c => c.status === 'active' || c.status === 'pending_renewal')} />
-        </div>
+        <p className="text-sm text-gray-500">Para renovar un contrato, entra a la propiedad correspondiente.</p>
       </div>
 
       {/* Filtros */}
