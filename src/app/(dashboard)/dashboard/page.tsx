@@ -88,7 +88,8 @@ export default async function DashboardPage() {
         <KPICard title="Renta Mensual Total" value={formatCurrency(data.totalMonthlyRent)} color="emerald" />
       </div>
 
-      {/* Alerts Section */}
+      {/* Contratos por Vencer */}
+      <h2 className="text-lg font-semibold text-gray-900">Contratos por Vencer</h2>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <AlertSection title="Esta Semana" items={data.thisWeek} level="danger" />
         <AlertSection title="Este Mes" items={data.thisMonth} level="warning" />

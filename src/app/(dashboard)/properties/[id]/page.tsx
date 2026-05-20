@@ -7,6 +7,7 @@ import { redirect, notFound } from 'next/navigation';
 import {
   formatCurrency,
   formatShortDate,
+  daysUntil,
   getStatusLabel,
   getStatusColor,
 } from '@/lib/utils';
@@ -39,8 +40,18 @@ export default async function PropertyDetailPage({ params }: Props) {
   if (!property) notFound();
 
   const activeContract = property.contracts.find(
-    (c) => c.status === 'ACTIVO'
+    (c) => c.status === 'active' || c.status === 'pending_renewal'
   );
+
+  // Contract status with colors
+  const getContractStatus = () => {
+    if (!activeContract) return { label: 'Sin Contrato', color: 'bg-gray-100 text-gray-600', level: 'none' }
+    const days = daysUntil(activeContract.endDate)
+    if (days < 0) return { label: 'Vencido', color: 'bg-red-100 text-red-700 border border-red-200', level: 'expired' }
+    if (days <= 30) return { label: `Por Vencer (${days}d)`, color: 'bg-orange-100 text-orange-700 border border-orange-200', level: 'warning' }
+    return { label: 'Activo', color: 'bg-green-100 text-green-700 border border-green-200', level: 'active' }
+  }
+  const contractStatus = getContractStatus();
 
   return (
     <div className="space-y-8">
@@ -165,155 +176,110 @@ export default async function PropertyDetailPage({ params }: Props) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Active Contract */}
+          {/* Estatus de Contrato */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Contrato Activo
-              </h2>
-              {!activeContract && (
-                <Link
-                  href={`/contracts/new?propertyId=${property.id}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-[#2663EB] text-white rounded-lg hover:bg-[#1d4fc2] transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  Añadir contrato
-                </Link>
-              )}
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Estatus de Contrato</h2>
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${contractStatus.color}`}>
+              {contractStatus.label}
             </div>
+
             {activeContract ? (
-              <div className="space-y-3">
-                <div>
-                  <span className="text-sm text-gray-500">Inquilino</span>
-                  <p className="text-sm font-medium text-gray-900">
-                    {activeContract.tenantName || '—'}
-                  </p>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Inquilino</span>
+                  <span className="font-medium text-gray-900">{activeContract.tenantName}</span>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">Periodo</span>
-                  <p className="text-sm text-gray-900">
-                    {formatShortDate(activeContract.startDate)} &mdash;{' '}
-                    {formatShortDate(activeContract.endDate)}
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Vigencia</span>
+                  <span className="text-gray-900">{formatShortDate(activeContract.startDate)} - {formatShortDate(activeContract.endDate)}</span>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500">Renta</span>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(activeContract.monthlyRent)}
-                  </p>
-                </div>
-
-                {/* Action buttons */}
-                <div className="space-y-2 pt-2">
-                  <Link
-                    href={`/contracts/${activeContract.id}`}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    Ver detalle del contrato
-                  </Link>
-                </div>
-
-                {/* Upload final signed contract */}
-                <div className="pt-2 border-t border-gray-100 mt-2">
-                  <p className="text-xs text-gray-500 mb-2 font-medium">Contrato definitivo firmado:</p>
-                  <ContractFileUpload
-                    contractId={activeContract.id}
-                    existingFileUrl={activeContract.contractFileUrl}
-                    existingFileName={activeContract.contractFileName}
-                  />
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Renta</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(activeContract.monthlyRent)}/mes</span>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
-                <div className="text-3xl mb-2">📄</div>
-                <p className="text-sm text-gray-500 mb-3">
-                  No hay contrato activo para esta propiedad.
-                </p>
-                <Link
-                  href={`/contracts/new?propertyId=${property.id}`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-[#2663EB] text-white rounded-lg hover:bg-[#1d4fc2] transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  Crear nuevo contrato
-                </Link>
-              </div>
+              <p className="mt-3 text-sm text-gray-500">No hay contrato activo.</p>
             )}
           </div>
 
-          {/* Contract History */}
+          {/* Contrato Firmado (upload) */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Historial de Contratos
-              </h2>
-              <span className="badge bg-gray-100 text-gray-600">{property.contracts.length}</span>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Contrato Firmado</h2>
+            {activeContract ? (
+              <ContractFileUpload
+                contractId={activeContract.id}
+                existingFileUrl={activeContract.contractFileUrl}
+                existingFileName={activeContract.contractFileName}
+              />
+            ) : (
+              <p className="text-sm text-gray-500">Crea un contrato primero.</p>
+            )}
+          </div>
+
+          {/* Acciones */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Acciones</h2>
+            <div className="space-y-2">
+              {activeContract ? (
+                <Link
+                  href={`/contracts/new?renewFrom=${activeContract.id}`}
+                  className="flex w-full items-center justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
+                >
+                  Renovar Contrato
+                </Link>
+              ) : (
+                <Link
+                  href={`/contracts/new?propertyId=${property.id}`}
+                  className="flex w-full items-center justify-center rounded-lg bg-[#2663EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4fc2] transition-colors"
+                >
+                  Crear Contrato
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Historial de Contratos */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-900">Historial</h2>
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{property.contracts.length}</span>
             </div>
             {property.contracts.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No hay contratos registrados.
-              </p>
+              <p className="text-sm text-gray-500">No hay contratos registrados.</p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-2">
                 {property.contracts.map((contract) => {
-                  const statusStyles =
-                    contract.status === 'active' ? 'bg-green-100 text-green-800' :
+                  const d = daysUntil(contract.endDate)
+                  const stStyle =
+                    contract.status === 'active' && d > 30 ? 'bg-green-100 text-green-700' :
+                    contract.status === 'active' && d > 0 ? 'bg-orange-100 text-orange-700' :
+                    contract.status === 'active' && d <= 0 ? 'bg-red-100 text-red-700' :
                     contract.status === 'expired' ? 'bg-gray-100 text-gray-600' :
-                    contract.status === 'pending_renewal' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  const statusLabel =
+                    contract.status === 'pending_renewal' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  const stLabel =
+                    contract.status === 'active' && d <= 0 ? 'Vencido' :
+                    contract.status === 'active' && d <= 30 ? 'Por Vencer' :
                     contract.status === 'active' ? 'Activo' :
                     contract.status === 'expired' ? 'Vencido' :
-                    contract.status === 'pending_renewal' ? 'Renovacion' :
+                    contract.status === 'pending_renewal' ? 'Pendiente' :
                     'Cancelado'
 
                   return (
-                    <li key={contract.id} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                      <Link
-                        href={`/contracts/${contract.id}`}
-                        className="block hover:bg-gray-50 -mx-2 px-2 py-1.5 rounded-lg transition-colors"
-                      >
+                    <li key={contract.id}>
+                      <Link href={`/contracts/${contract.id}`} className="block p-2 rounded-lg hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">
-                            {contract.tenantName || 'Sin inquilino'}
-                          </span>
-                          <span className={`badge ${statusStyles}`}>
-                            {statusLabel}
-                          </span>
+                          <span className="text-sm font-medium text-gray-900 truncate">{contract.tenantName || 'Sin inquilino'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stStyle}`}>{stLabel}</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatShortDate(contract.startDate)} &mdash;{' '}
-                          {formatShortDate(contract.endDate)}
-                        </p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-xs font-medium text-gray-700">
-                            {formatCurrency(contract.monthlyRent)}/mes
-                          </p>
-                          {contract.contractFileUrl && (
-                            <span className="text-xs text-green-600 flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              Contrato subido
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{formatShortDate(contract.startDate)} - {formatShortDate(contract.endDate)}</p>
+                        <p className="text-xs font-medium text-gray-700 mt-0.5">{formatCurrency(contract.monthlyRent)}/mes</p>
                       </Link>
                     </li>
                   )
                 })}
               </ul>
-            )}
-
-            {/* Add new contract button at bottom of history */}
-            {activeContract && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <Link
-                  href={`/contracts/new?propertyId=${property.id}`}
-                  className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800 font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  Registrar nuevo contrato
-                </Link>
-              </div>
             )}
           </div>
         </div>
