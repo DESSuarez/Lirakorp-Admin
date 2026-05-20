@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
           propertyUse: propertyUse || 'CASA HABITACION',
           notes: notes || null,
           hasGuarantor: hasGuarantor !== undefined ? hasGuarantor : true,
-          status: 'pending_renewal',
+          status: 'active',
           renewalToken: crypto.randomBytes(32).toString('hex'),
         },
         include: {

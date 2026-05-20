@@ -23,6 +23,13 @@ export default function RenewContractForm({ contractId, propertyId }: { contract
       if (!res.ok) throw new Error('No se pudo obtener el contrato actual')
       const current = await res.json()
 
+      // Validate: new start must be after old end date
+      const oldEndDate = new Date(current.endDate)
+      const newStartDate = new Date(startDate)
+      if (newStartDate < oldEndDate) {
+        throw new Error(`La fecha de inicio debe ser posterior al vencimiento del contrato anterior (${oldEndDate.toLocaleDateString('es-MX')})`)
+      }
+
       // Calculate new rent with increment
       const increment = current.annualIncrement || 0
       const newRent = Math.round(current.monthlyRent * (1 + increment / 100))
