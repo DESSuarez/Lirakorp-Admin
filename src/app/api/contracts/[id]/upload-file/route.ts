@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
 import {
   sendEmail,
   buildAdminContractUploadedEmail,
@@ -54,19 +52,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const ext = path.extname(file.name) || '.pdf'
-  const fileName = `contrato-${id}-${Date.now()}${ext}`
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'contracts')
-
-  await mkdir(uploadDir, { recursive: true })
-  await writeFile(path.join(uploadDir, fileName), buffer)
-
-  const fileUrl = `/uploads/contracts/${fileName}`
+  const base64 = buffer.toString('base64')
+  const dataUri = `data:${file.type};base64,${base64}`
 
   const updated = await prisma.contract.update({
     where: { id },
     data: {
-      contractFileUrl: fileUrl,
+      contractFileUrl: dataUri,
       contractFileName: file.name,
       status: 'active',
     },
@@ -134,12 +126,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         endDate: formatDate(contract.endDate),
         fileName: file.name,
       })
-      const filePath = path.join(uploadDir, fileName)
       await sendEmail(
         contract.tenantEmail,
         `Contrato renovado - ${propertyName}`,
         html,
-        [{ filename: file.name, path: filePath }],
       )
     } catch (e) {
       console.error('Error enviando email inquilino contrato subido:', e)

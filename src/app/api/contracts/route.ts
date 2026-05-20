@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    if (!propertyId || !tenantName || !tenantEmail || !startDate || !endDate || !monthlyRent || !depositAmount) {
+    if (!propertyId || !tenantName || !startDate || !endDate || !monthlyRent) {
       return NextResponse.json(
         { error: 'Faltan campos obligatorios' },
         { status: 400 }
