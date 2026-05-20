@@ -95,6 +95,17 @@ export default async function PropertyDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Foto principal */}
+          {property.photos.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              <img
+                src={property.photos.find((p: any) => p.isPrimary)?.url || property.photos[0]?.url}
+                alt={property.name}
+                className="w-full h-56 object-cover"
+              />
+            </div>
+          )}
+
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Informaci&oacute;n General
@@ -277,7 +288,7 @@ export default async function PropertyDetailPage({ params }: Props) {
                         <p className="text-xs font-medium text-gray-700">{formatCurrency(contract.monthlyRent)}/mes</p>
                         {contract.contractFileUrl && (
                           <a
-                            href={contract.contractFileUrl}
+                            href={`/api/contracts/${contract.id}/view-file`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-blue-600 hover:underline flex items-center gap-1"

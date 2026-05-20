@@ -42,10 +42,7 @@ export async function PUT(
     if (title) updateData.title = title;
     if (message !== undefined) updateData.message = message;
     if (dueDate) updateData.dueDate = new Date(dueDate);
-    if (status === 'dismissed') {
-      updateData.dismissedAt = new Date();
-      updateData.dismissedBy = (session.user as any)?.id || session.user?.email;
-    }
+    // dismissedAt/dismissedBy not in schema, skip
 
     const alert = await prisma.alert.update({
       where: { id },

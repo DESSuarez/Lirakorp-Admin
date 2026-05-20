@@ -72,15 +72,15 @@ export default function ContractFileUpload({ contractId, existingFileUrl, existi
           </div>
           <div className="flex gap-2">
             <a
-              href={existingFileUrl}
+              href={`/api/contracts/${contractId}/view-file`}
               target="_blank"
               className="flex-1 text-center px-2 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Ver
             </a>
             <a
-              href={existingFileUrl}
-              download={existingFileName}
+              href={`/api/contracts/${contractId}/view-file`}
+              target="_blank"
               className="flex-1 text-center px-2 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Descargar

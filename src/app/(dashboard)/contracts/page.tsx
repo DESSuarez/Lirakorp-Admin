@@ -127,33 +127,18 @@ export default async function ContractsPage({
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Propiedad
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Inquilino
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Fecha Inicio
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Fecha Fin
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Revisión
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Renta Mensual
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Estado
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Acciones
-              </th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Inquilino</th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Inicio</th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Fin</th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Renta</th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Estado</th>
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
             {contracts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
+                <td colSpan={7} className="px-3 py-12 text-center text-sm text-gray-500">
                   No se encontraron contratos.
                 </td>
               </tr>
@@ -164,45 +149,35 @@ export default async function ContractsPage({
 
                 return (
                   <tr key={contract.id} className={`${urgencyClass} hover:bg-gray-50`}>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                    <td className="px-3 py-3 text-sm font-medium text-gray-900">
                       <Link href={`/properties/${contract.property.id}`} className="hover:text-blue-600">
                         {contract.property.name}
                       </Link>
-                      <div className="text-xs text-gray-500">{contract.property.zone?.name}</div>
+                      <div className="text-xs text-gray-400">{contract.property.zone?.name}</div>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                    <td className="px-3 py-3 text-sm text-gray-700 truncate max-w-[180px]">
                       {contract.tenantName}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                    <td className="px-3 py-3 text-xs text-gray-600">
                       {formatShortDate(contract.startDate)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      <span>{formatShortDate(contract.endDate)}</span>
+                    <td className="px-3 py-3 text-xs text-gray-600">
+                      {formatShortDate(contract.endDate)}
                       {contract.status === 'active' && daysLeft <= 30 && (
-                        <span className="ml-2 text-xs font-medium text-red-600">
-                          ({daysLeft} días)
-                        </span>
+                        <span className="ml-1 text-xs font-medium text-red-600">({daysLeft}d)</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {contract.reviewDate ? formatShortDate(contract.reviewDate) : '—'}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                    <td className="px-3 py-3 text-xs text-gray-700">
                       {formatCurrency(contract.monthlyRent)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(contract.status)}`}
-                      >
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(contract.status)}`}>
                         {getStatusLabel(contract.status)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm">
-                      <Link
-                        href={`/properties/${contract.property.id}`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Ver propiedad
+                    <td className="px-3 py-3 text-xs">
+                      <Link href={`/properties/${contract.property.id}`} className="text-blue-600 hover:text-blue-900">
+                        Ver
                       </Link>
                     </td>
                   </tr>
