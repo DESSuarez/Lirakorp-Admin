@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { formatCurrency, getStatusLabel, getStatusColor } from '@/lib/utils';
+import DeletePropertyButton from './DeletePropertyButton';
 
 interface SearchParams {
   zone?: string;
@@ -240,13 +241,14 @@ export default async function PropertiesPage({
                   <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
                     {formatCurrency(property.monthlyRent)}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
                     <Link
                       href={`/properties/${property.id}`}
                       className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                     >
                       Ver
                     </Link>
+                    <DeletePropertyButton propertyId={property.id} propertyName={property.name} />
                   </td>
                 </tr>
               ))
