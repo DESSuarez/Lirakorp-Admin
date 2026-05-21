@@ -10,7 +10,7 @@ async function getDashboardData() {
   const in60Days = addMonths(now, 2)
 
   const [properties, contracts, zones, upcomingContracts, reviewContracts, recentAlerts] = await Promise.all([
-    prisma.property.findMany({ include: { zone: true } }),
+    prisma.property.findMany({ include: { zone: true, contracts: { where: { status: { in: ['active', 'pending_renewal'] } } } } }),
     prisma.contract.findMany({ where: { status: { in: ['active', 'pending_renewal'] } }, include: { property: { include: { zone: true } } } }),
     prisma.zone.findMany({ include: { properties: { include: { contracts: { where: { status: { in: ['active', 'pending_renewal'] } } } } } } }),
     // Contracts expiring in next 60 days
@@ -33,19 +33,31 @@ async function getDashboardData() {
     }),
   ])
 
+  // Helper: property is rented if status is rented/OCUPADO or has active non-expired contract
+  const isRented = (p: any) => {
+    if (p.status === 'rented' || p.status === 'OCUPADO') return true
+    if (p.contracts && p.contracts.length > 0) {
+      return p.contracts.some((c: any) => c.status === 'active' && new Date(c.endDate) >= new Date())
+    }
+    return false
+  }
+
   const totalProperties = properties.length
-  const rentedProperties = properties.filter((p) => p.status === 'rented').length
-  const availableProperties = properties.filter((p) => p.status === 'available').length
+  const rentedProperties = properties.filter(isRented).length
+  const availableProperties = totalProperties - rentedProperties
   const occupancyRate = totalProperties > 0 ? (rentedProperties / totalProperties) * 100 : 0
-  const totalMonthlyRent = contracts.reduce((sum, c) => sum + c.monthlyRent, 0)
+  const totalMonthlyRent = properties.filter(isRented).reduce((sum, p) => {
+    const activeContract = (p as any).contracts?.find((c: any) => c.status === 'active')
+    return sum + (activeContract?.monthlyRent || p.monthlyRent || 0)
+  }, 0)
 
   // By zone
   const zoneStats = zones.map((zone) => {
     const total = zone.properties.length
-    const rented = zone.properties.filter((p) => p.contracts.length > 0).length
+    const rented = zone.properties.filter(isRented).length
     const zoneRent = zone.properties.reduce((sum, p) => {
-      const activeContract = p.contracts[0]
-      return sum + (activeContract?.monthlyRent || 0)
+      const activeContract = p.contracts?.find((c: any) => c.status === 'active')
+      return sum + (activeContract?.monthlyRent || p.monthlyRent || 0)
     }, 0)
     return {
       id: zone.id,

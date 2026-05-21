@@ -27,11 +27,14 @@ async function getZoneReports(): Promise<ZoneReport[]> {
 
   return zones.map((zone) => {
     const total = zone.properties.length
-    const rented = zone.properties.filter((p) => p.contracts.length > 0).length
+    const rented = zone.properties.filter((p: any) => {
+      if (p.status === 'rented' || p.status === 'OCUPADO') return true
+      return p.contracts.some((c: any) => c.status === 'active' && new Date(c.endDate) >= new Date())
+    }).length
     const available = total - rented
     const monthlyRent = zone.properties.reduce((sum, p) => {
-      const activeContract = p.contracts[0]
-      return sum + (activeContract?.monthlyRent || 0)
+      const activeContract = p.contracts?.find((c: any) => c.status === 'active')
+      return sum + (activeContract?.monthlyRent || (p as any).monthlyRent || 0)
     }, 0)
 
     return {
