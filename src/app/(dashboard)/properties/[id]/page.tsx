@@ -56,6 +56,20 @@ export default async function PropertyDetailPage({ params }: Props) {
   }
   const contractStatus = getContractStatus();
 
+  // Auto-sync property status with contract status
+  const expectedStatus =
+    contractStatus.level === 'active' || contractStatus.level === 'warning' ? 'rented' :
+    contractStatus.level === 'expired' || contractStatus.level === 'none' ? 'available' :
+    property.status;
+
+  if (property.status !== expectedStatus && property.status !== 'maintenance' && property.status !== 'inactive') {
+    await prisma.property.update({
+      where: { id: property.id },
+      data: { status: expectedStatus },
+    });
+    property.status = expectedStatus;
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
