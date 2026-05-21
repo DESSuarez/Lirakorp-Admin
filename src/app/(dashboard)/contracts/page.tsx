@@ -171,9 +171,14 @@ export default async function ContractsPage({
                       {formatCurrency(contract.monthlyRent)}
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(contract.status)}`}>
-                        {getStatusLabel(contract.status)}
-                      </span>
+                      {(() => {
+                        const realStatus = contract.status === 'active' && daysLeft < 0 ? 'expired' : contract.status;
+                        return (
+                          <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(realStatus)}`}>
+                            {getStatusLabel(realStatus)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 text-xs">
                       <Link href={`/properties/${contract.property.id}`} className="text-blue-600 hover:text-blue-900">

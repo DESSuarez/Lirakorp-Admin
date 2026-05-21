@@ -101,7 +101,7 @@ export default async function PropertyDetailPage({ params }: Props) {
               <img
                 src={property.photos.find((p: any) => p.isPrimary)?.url || property.photos[0]?.url}
                 alt={property.name}
-                className="w-full h-56 object-cover"
+                className="w-full h-72 object-cover"
               />
             </div>
           )}
@@ -211,11 +211,13 @@ export default async function PropertyDetailPage({ params }: Props) {
                   <span className="text-gray-500">Renta</span>
                   <span className="font-semibold text-gray-900">{formatCurrency(activeContract.monthlyRent)}/mes</span>
                 </div>
-                <EditContractDates
-                  contractId={activeContract.id}
-                  currentStart={activeContract.startDate.toISOString().split('T')[0]}
-                  currentEnd={activeContract.endDate.toISOString().split('T')[0]}
-                />
+                {contractStatus.level === 'active' || contractStatus.level === 'warning' ? (
+                  <EditContractDates
+                    contractId={activeContract.id}
+                    currentStart={activeContract.startDate.toISOString().split('T')[0]}
+                    currentEnd={activeContract.endDate.toISOString().split('T')[0]}
+                  />
+                ) : null}
               </div>
             ) : (
               <p className="mt-3 text-sm text-gray-500">No hay contrato activo.</p>
